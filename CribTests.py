@@ -50,13 +50,20 @@ class CribTest(unittest.TestCase):
         self.assertEqual(score[0], 2)
         print(score[1])
                
-    def testFlush(self):
-        h = self.CardsFromTupleHand([('K', CLUBS), ('Q', CLUBS), (2, DIAMONDS),
-                                     (2, CLUBS), (6, CLUBS)])
+    def testFlushInHand(self):
+        h = self.CardsFromTupleHand([('K', CLUBS), ('Q', CLUBS), (6, CLUBS),
+                                     (2, DIAMONDS)])
         score = Crib.score_hand(h)
-        self.assertEqual(score[0], 6)
+        self.assertEqual(score[0], 3)
         print(score[1])
         
+    def testNotAFlushInHand(self):
+        h = self.CardsFromTupleHand([('K', CLUBS), ('Q', CLUBS), (2, DIAMONDS),
+                                     (4, CLUBS)])
+        score = Crib.score_hand(h)
+        self.assertEqual(score[0], 0)
+        print(score[1])
+
     def testMultiplePairs(self):
         h = self.CardsFromTupleHand([('Q', CLUBS), (6, HEARTS), 
                                      ('Q', DIAMONDS), ('Q', HEARTS), 
@@ -95,7 +102,14 @@ class CribTest(unittest.TestCase):
         
     def testNotAFlushInBox(self):
         hand = [Crib.Card(10, CLUBS), Crib.Card(3, CLUBS), Crib.Card(6, CLUBS),
-                Crib.Card(12, HEARTS), Crib.Card(13, CLUBS)]
+                Crib.Card(12, CLUBS), Crib.Card(13, HEARTS)]
+        score = Crib.score_hand(hand, True)
+        self.assertEqual(score[0], 0)
+        print(score[1])
+        
+    def testDefinitelyNotAFlushInBox(self):
+        hand = [Crib.Card(10, CLUBS), Crib.Card(3, SPADES), Crib.Card(6, CLUBS),
+                Crib.Card(12, CLUBS), Crib.Card(13, CLUBS)]
         score = Crib.score_hand(hand, True)
         self.assertEqual(score[0], 0)
         print(score[1])

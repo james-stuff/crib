@@ -876,13 +876,21 @@ def runs_in_pegging(cards_played):
                 return len(seq)
     return run_length
 
+def flush_points(hand):
+    flush_suit = hand[0].suit
+    flush_length = len([c for c in hand if c.suit == flush_suit])
+    if flush_length == len(hand):
+        return flush_length
+    if len(hand) == 4 and flush_length == 3 and hand[-1].suit != flush_suit:
+        return 3
+    return 0
+
 def score_hand(hand, is_box=False):
     score_int = 0
     score_text = ''
-    even_numbers = ['two', 'four', 'six', 'eight', 'ten', 'twelve', 'fourteen',
-                    'sixteen']
-    all_numbers = ['a', 'two', 'three', 'four', 'five', 'six', 'seven',
-                   'eight', 'nine', 'ten']
+    numbers = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven',
+               'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 
+               'fourteen', 'fifteen', 'sixteen']
 
     all_pairs = find_all_possible_pairs_in(hand)
 
@@ -901,65 +909,46 @@ def score_hand(hand, is_box=False):
         fifteens += sum([c.value for c in hand]) == 15
 
     score_int = fifteens * 2
-    for f in range(fifteens):
-        if f > 0:
-            score_text += ', '
-        score_text += 'fifteen ' + even_numbers[f]
+    for f in range(1, fifteens + 1):
+        score_text += what_to_append_to_score_text(score_text, numbers[15] + 
+                                                   ' ' + numbers[f*2])
 
     # Any runs?
     sorted_hand = sorted(hand, key = lambda c: c.rank)
     run_results = find_runs(sorted_hand)
     if len(run_results):
         score_int += run_results[0] * run_results[1]
-        if len(score_text) > 0:
-            score_text += ', '
         if run_results[0] == 1:
-            score_text += 'a run of '
+            score_text += what_to_append_to_score_text(score_text, 'a run of ')
         elif run_results[0] > 1:
-            score_text += all_numbers[run_results[0] - 1] + ' runs of '
-        score_text += all_numbers[run_results[1] - 1]
+            score_text += what_to_append_to_score_text(score_text, 
+                                                       numbers[run_results[0]] + ' runs of ')
+        score_text += numbers[run_results[1]]
 
     # Any flushes?
-    # can be three, but all three must be in hand
-    # can go up to four if the face-up card is also the same suit
-    required_length = 3
-    if is_box:
-        required_length = 4
-    elif len(hand) == 3:    # v2.0.7, 30/01/20: for when method called from SmartComputer.two_cards_for_box()
-        required_length = 2 # lines added: these two, plus the 'if flush_length > 2' test
-    for s in SUITS:
-        flush_length = len(list(filter(lambda x: x.suit == s, hand[:-1])))
-        if flush_length >= required_length:
-            if hand[-1].suit == s:
-                flush_length += 1
-            if flush_length > 2:
-                if len(score_text) > 0:
-                    score_text += ', '
-                score_int += flush_length
-                score_text += 'a flush of ' + all_numbers[flush_length - 1]
+    flush_length = flush_points(hand)
+    if flush_length > 2:
+        score_int += flush_length
+        score_text += what_to_append_to_score_text(score_text, 'a flush of ' + 
+                                                   numbers[flush_length])
 
     # How many pairs?
     pairs = pair_counter(all_pairs, is_pair)
-
     score_int += pairs * 2
     if pairs > 0:
-        if len(score_text) > 0:
-            score_text += ', '
-        score_text += all_numbers[pairs - 1] + ' pair'
-    if pairs > 1:
-        score_text += 's'
+        score_text += what_to_append_to_score_text(score_text, numbers[pairs] + ' pair')
+        if pairs > 1:
+            score_text += 's'
 
     if score_int == 4 and pairs == 2:
         score_text = 'Morgan\'s Orchard'
 
     # one for his knob (assumes face-up card was appended to hand)
-    if len(hand) > 3:   # This extra condition is only change made here for v2, 27/01/20
-        for card in hand[:-1]:
-            if card.rank == 11 and card.suit == hand[-1].suit:
-                score_int += 1
-                if len(score_text) > 0:
-                    score_text += ', '
-                score_text += 'one for his knob'
+    if len(hand) > 3:
+        knob = [c for c in hand[:-1] if c.rank == 11 and c.suit == hand[-1].suit]
+        if len(knob) == 1:
+            score_int += 1
+            score_text += what_to_append_to_score_text(score_text, 'one for his knob')
 
     if score_int == 0:
         odd_card_found = len([c for c in hand if c.rank % 2 == 1])
@@ -977,6 +966,11 @@ def score_hand(hand, is_box=False):
             score_text = score_text[:last_comma] + ' and' + score_text[last_comma + 1:]
 
     return (score_int, score_text)
+
+def what_to_append_to_score_text(score_string, latest_addition):
+    if len(score_string) > 0:
+        return ', ' + latest_addition
+    return latest_addition
 
 if __name__ == '__main__':
     the_table = Table()
