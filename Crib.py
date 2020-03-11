@@ -583,8 +583,7 @@ class Round():
             hand_or_box = ' hand'
 
         self.ui_wait_for_click('Show ' + owner + hand_or_box)
-        int_score, text_score = score_hand(card_list + [self.face_up_card],
-                                          is_box)
+        int_score, text_score = score_hand(card_list + [self.face_up_card])
         str_info = text_score + ' is ' + str(int_score)
         if not self.real_mode:
             str_info = str([str(c) for c in card_list]) + str_info
@@ -885,7 +884,7 @@ def flush_points(hand):
         return 3
     return 0
 
-def score_hand(hand, is_box=False):
+def score_hand(hand):
     score_int = 0
     score_text = ''
     numbers = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven',
