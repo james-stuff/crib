@@ -13,7 +13,11 @@ DIAMONDS = '\u2666'
 SPADES = '\u2660'
 SUITS = [HEARTS, CLUBS, DIAMONDS, SPADES]
 WIN_SCORE = 121
-VERSION = '2.0.12'
+NUMBERS = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven',
+           'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen',
+           'fourteen', 'fifteen', 'sixteen']
+VERSION = '2.1.0'
+
 
 def make_spacer(owner_frame, text_string, column, min_size):
     my_label = tkinter.Label(owner_frame, text=text_string, fg='green',
@@ -21,6 +25,7 @@ def make_spacer(owner_frame, text_string, column, min_size):
     my_label.grid(row=0, column=column, sticky='w')
     if min_size > 0:
         owner_frame.grid_columnconfigure(column, minsize=min_size)
+
 
 class Table():
     colour_dict = {CLUBS: 'black', SPADES: 'black', HEARTS: 'red',
@@ -40,9 +45,9 @@ class Table():
 
         for frm in range(4):
             self.frame_list.append(tkinter.Frame(self.gui, width=frame_widths[frm],
-                                            height=150, bg='green'))
+                                                 height=150, bg='green'))
             self.frame_list[-1].grid(row=frame_rows[frm],
-                      column=frame_cols[frm], sticky='w')
+                                     column=frame_cols[frm], sticky='w')
 
         info_frame = tkinter.Frame(self.gui, bg='green')
         info_frame.grid(row=1, columnspan=3, sticky='we')
@@ -56,7 +61,7 @@ class Table():
         l_pack_cards = []
         for n in range(4):
             l_pack_cards.append(tkinter.Label(self.frame_list[0],
-                                              font = ('Arial Bold', 2),
+                                              font=('Arial Bold', 2),
                                               borderwidth=1,
                                               height=29, width=1,
                                               relief='raised'))
@@ -108,6 +113,7 @@ class Table():
                 self.gui.destroy()
                 break
 
+
 class Game():
     def __init__(self, table):
         self.table = table
@@ -126,15 +132,17 @@ class Game():
             self.table.await_control_button_click('Deal for new round')
             if this_round != None:
                 this_round.btn_box.destroy_cards()
-                del(this_round)
+                del (this_round)
             this_round = Round(self)
             this_round.play_round()
             self.player_has_box = not self.player_has_box
         this_round.btn_box.destroy_cards()
-        del(this_round)
+        del (this_round)
+
 
 class ButtonList():
     ''' a list of on-screen card buttons that allows Round to interact with the UI'''
+
     def __init__(self, table, card_list, buttons, frame_no, first_column, length):
         self.card_list = card_list
         self.first_column = first_column
@@ -143,8 +151,8 @@ class ButtonList():
 
         for n in range(length):
             self.buttons.append(tkinter.Button(self.table.frame_list[frame_no],
-                                     font=('Arial Bold', 20),
-                                     height=3, width=3))
+                                               font=('Arial Bold', 20),
+                                               height=3, width=3))
 
     def populate(self, card_list):
         self.card_list = card_list
@@ -164,7 +172,7 @@ class ButtonList():
                 self.table.display_card(self.buttons[card_index],
                                         self.card_list[card_index])
             self.buttons[card_index].grid(row=0, column=self.first_column +
-                                            card_index, pady=10)
+                                                        card_index, pady=10)
 
     def destroy_cards(self, index=-1, destroy_button=True):
         start_index = 0
@@ -178,8 +186,9 @@ class ButtonList():
             b.grid_forget()
 
         if destroy_button and index > -1:
-            del(self.buttons[start_index])
-            del(self.clickable_cards[index])
+            del (self.buttons[start_index])
+            del (self.clickable_cards[index])
+
 
 class Round():
     def __init__(self, game=None, cards=[], comp_cards=[]):
@@ -243,7 +252,7 @@ class Round():
 
             self.button_colour = self.b_my_cards[0].cget('bg')
         else:
-            self.output_file = open('MonteCarloOutput' + VERSION + '.txt', 
+            self.output_file = open('MonteCarloOutput' + VERSION + '.txt',
                                     'a', encoding='utf-8')
 
     def await_card_click(self):
@@ -297,8 +306,8 @@ class Round():
                     self.btn_played.show_cards(face_down=True)
                     self.turn_over_played_cards_on_next_turn = False
                 self.btn_played.buttons[no_of_cards_down - 2].configure(width=2,
-                                   font=('Arial Bold', 12), anchor='nw',
-                                   height=5)
+                                                                        font=('Arial Bold', 12), anchor='nw',
+                                                                        height=5)
             self.btn_played.show_cards(no_of_cards_down - 1)
 
     def ui_pegging(self, whose_turn, points_to_add, back_peg_moves=True):
@@ -356,7 +365,7 @@ class Round():
                     self.box.append(card_for_box)
                     # find and remove the card from player's hand
                     ind = self.my_cards.index(card_for_box)
-                    del(self.my_cards[ind])
+                    del (self.my_cards[ind])
                     box_string += str(card_for_box)
                     if len(box_string) < 4:
                         self.update_score_info('Card added to box: ' + box_string)
@@ -367,8 +376,8 @@ class Round():
                 # computer adds two cards to the box
                 self.ui_wait_for_click('Add cards to box for computer')
                 discards = self.computer.two_cards_for_box(self.comp_cards)
-#                print('computer discards:', [str(d) for d in discards])
-#                print('computer still has:', [str(x) for x in self.comp_cards])
+                #                print('computer discards:', [str(d) for d in discards])
+                #                print('computer still has:', [str(x) for x in self.comp_cards])
                 for disc in discards:
                     self.comp_cards.remove(disc)
                     self.box.append(disc)
@@ -402,7 +411,7 @@ class Round():
                 card_to_play = self.computer_picks_card()
             else:
                 card_to_play = None
-                
+
             if type(card_to_play) == Card:
                 self.play_card(card_to_play)
                 self.ui_update_played_cards()
@@ -417,7 +426,7 @@ class Round():
                 self.award_go_point()
                 self.reset_variables_at_31()
                 self.is_players_turn = not self.played_cards[-1] in self.my_cards
-                
+
     def check_if_knock_required(self):
         if not self.can_go():
             if self.is_players_turn:
@@ -431,12 +440,12 @@ class Round():
     def can_go(self):
         turn_dict = {True: self.my_cards, False: self.comp_cards}
         whose_hand = turn_dict[self.is_players_turn]
-        return any(c not in self.played_cards and self.can_play_card(c) 
+        return any(c not in self.played_cards and self.can_play_card(c)
                    for c in whose_hand)
 
     def can_play_card(self, card):
         return self.running_total + card.value <= 31
-    
+
     def player_picks_card(self):
         self.ui_btn_update('It\'s your turn!  Click a card to play it')
         if self.real_mode:
@@ -600,6 +609,7 @@ class Round():
         str_info += self.check_for_win(is_player, new_score)
         self.update_score_info(str_info)
 
+
 class SmartComputer():
 
     def __init__(self, current_round):
@@ -613,76 +623,75 @@ class SmartComputer():
         for pair in all_pairs:
             triplet = [c for c in dealt_hand if c not in pair]
             all_triplets_scored.append([triplet, score_hand(triplet)[0]])
-           
+
         self.refine_box_selection(all_triplets_scored)
         all_triplets_scored.sort(key=lambda tr: tr[1], reverse=True)
 
-#        print('All triplets, scored:')
-#        for tr in all_triplets_scored:
-#            print([str(c) for c in tr[0]], str(tr[1]))
+        #        print('All triplets, scored:')
+        #        for tr in all_triplets_scored:
+        #            print([str(c) for c in tr[0]], str(tr[1]))
 
         # discard the two cards that are not in the highest-scoring triplet:
         desired_triplet = all_triplets_scored[0][0]
         final_selection = [c for c in dealt_hand if c not in desired_triplet]
         return final_selection
-    
+
     def refine_box_selection(self, all_trios):
         for sel in all_trios:
             sel[1] += self.evaluate_run_potential(sel[0])
             sel[1] += self.evaluate_flush_extension_potential(sel[0])
             sel[1] += self.evaluate_fifteen_potential(sel[0])
             sel[1] += self.evaluate_knob_potential(sel[0])
-    
+
     def evaluate_run_potential(self, triplet):
         strong_run_potential = weak_run_potential = 0
         pairs = find_all_possible_pairs_in(triplet)
         for pr in pairs:
             if pr[0].rank + pr[1].rank == 3 or pr[0].rank + pr[1].rank == 25:
-                weak_run_potential += 3 * 1/13
-#                print('Weak run potential for A2 or QK')
+                weak_run_potential += 3 * 1 / 13
+            #                print('Weak run potential for A2 or QK')
             elif abs(pr[0].rank - pr[1].rank) == 2:
-                weak_run_potential += 3 * 1/13
-#                print('Weak run potential for two cards 2 apart')
+                weak_run_potential += 3 * 1 / 13
+            #                print('Weak run potential for two cards 2 apart')
             elif abs(pr[0].rank - pr[1].rank) == 1:
-                strong_run_potential += 3 * 2/13
-#                print('Strong run potential')
+                strong_run_potential += 3 * 2 / 13
+        #                print('Strong run potential')
         return strong_run_potential + weak_run_potential
-    
+
     def evaluate_flush_extension_potential(self, triplet):
         suits_found = set([t.suit for t in triplet])
         if len(suits_found) == 1:
-#            self.round.update_score_info('flush extension potential: ' + str([str(t) for t in triplet]))
-            return 10/47
+            #            self.round.update_score_info('flush extension potential: ' + str([str(t) for t in triplet]))
+            return 10 / 47
         return 0
-    
+
     def evaluate_fifteen_potential(self, triplet):
         additional_likely_points = len([t for t in triplet if t.value == 5])
         pairs = find_all_possible_pairs_in(triplet)
         additional_likely_points += len([pr for pr in pairs if pr[0].value + pr[1].value == 5])
-#        if additional_likely_points > 0:
-#            self.round.update_score_info(str([str(t) for t in triplet]) + 
-#                                          ' Extra fifteen potential x' + 
-#                                          str(additional_likely_points))
-        return additional_likely_points * 2 * 4/13
-    
+        #        if additional_likely_points > 0:
+        #            self.round.update_score_info(str([str(t) for t in triplet]) + 
+        #                                          ' Extra fifteen potential x' + 
+        #                                          str(additional_likely_points))
+        return additional_likely_points * 2 * 4 / 13
+
     def evaluate_knob_potential(self, triplet):
         # I am double-rating the score instead of just adding to the score for hands that have the J
         # and taking away from hands that don't.  Only care about RELATIVE value of hands.  Is this right??
         if self.round.player_has_box:
-            knob_potential = len([t for t in triplet if t.rank == 11]) * 2 * 12/51
-#            self.round.update_score_info('Knob potential: ' + str([str(t) for t in triplet]) + 
-#                                         str(knob_potential))
+            knob_potential = len([t for t in triplet if t.rank == 11]) * 2 * 12 / 51
+            #            self.round.update_score_info('Knob potential: ' + str([str(t) for t in triplet]) + 
+            #                                         str(knob_potential))
             return knob_potential
         return 0
-        
 
     def card_to_play(self):
         cards_down = self.round.played_cards
-        available_cards = [c for c in self.round.comp_cards if 
+        available_cards = [c for c in self.round.comp_cards if
                            c not in cards_down and self.round.can_play_card(c)]
         if len(available_cards) == 1:
             return available_cards[0]
-        
+
         card_scores = []
         of_a_kind_scores = {0: 0, 1: 2, 2: 6, 3: 12}
         for c in available_cards:
@@ -695,8 +704,9 @@ class SmartComputer():
                 score = -1
             card_scores.append([c, score])
         card_scores.sort(key=lambda i: i[1])
-#        print('card_scores:', [str(cs[0]) + ' ' + str(cs[1]) for cs in card_scores])
+        #        print('card_scores:', [str(cs[0]) + ' ' + str(cs[1]) for cs in card_scores])
         return card_scores[-1][0]
+
 
 class PegBoard():
 
@@ -715,6 +725,7 @@ class PegBoard():
         self.my_pegs.reset()
         self.comp_pegs.reset()
 
+
 class PegRow():
     empty_peg_row = '¦' + ((WIN_SCORE // 5) * (5 * '.' + '¦'))
     peg = '\u2022'
@@ -730,12 +741,12 @@ class PegRow():
     def reset(self):
         self.front_peg = self.back_peg = 0
         self.draw_for_new_game()
-        
+
     def draw_for_new_game(self):
-        self.full_peg_row = (self.peg + ' ' + self.empty_peg_row + 
-                            '  ' +  '0'.rjust(4))
+        self.full_peg_row = (self.peg + ' ' + self.empty_peg_row +
+                             '  ' + '0'.rjust(4))
         self.draw()
-        
+
     def draw(self):
         if __name__ == '__main__':
             self.screen_label.configure(text=self.full_peg_row)
@@ -747,7 +758,7 @@ class PegRow():
         if move_back_peg:
             self.back_peg = self.front_peg
         self.front_peg += points_to_add
-        
+
         self.full_peg_row = '  ' + self.empty_peg_row + '  '
         self.insert_peg_for_score(self.back_peg)
         self.insert_peg_for_score(self.front_peg)
@@ -757,7 +768,7 @@ class PegRow():
         if __name__ == '__main__':
             self.draw()
         return self.front_peg
-    
+
     def insert_peg_for_score(self, peg_value):
         peg_position = self.calc_peg_pos(peg_value)
         self.full_peg_row = (self.full_peg_row[:peg_position] + self.peg +
@@ -777,6 +788,7 @@ class PegRow():
             position += 1
         return position
 
+
 class Pack():
     def __init__(self):
         # generate the pack of 52 cards:
@@ -789,6 +801,7 @@ class Pack():
 
     def deal(self, how_many_cards):
         return [self.pack.pop() for n in range(how_many_cards)]
+
 
 class Card():
     picdic = {1: 'A', 11: 'J', 12: 'Q', 13: 'K'}
@@ -807,6 +820,7 @@ class Card():
             return self.picdic[self.rank] + self.suit
         return str(self.value) + self.suit
 
+
 def find_all_possible_pairs_in(hand):
     pairs = []
     for ind, card in enumerate(hand[:-1]):
@@ -814,40 +828,19 @@ def find_all_possible_pairs_in(hand):
             pairs.append([card, c])
     return pairs
 
+
 def pair_counter(list_of_pairs, matching_test, value=0):
     expr = lambda pr: matching_test(pr, value)
     return len([i for i in filter(expr, list_of_pairs)])
 
+
 def is_pair(two_cards, unused_value=0):
     return two_cards[0].rank == two_cards[1].rank
+
 
 def adds_up_to(two_cards, target_value):
     return two_cards[0].value + two_cards[1].value == target_value
 
-def find_runs(cards):
-    result = []
-    run_structure = [1]  # for a run, will be no. of each rank in run
-                        # e.g. for A,2,2,3 will be [1, 2, 1]
-    last_card = cards[0].rank
-    for c in cards[1:]:
-        this_card = c.rank
-        if this_card == last_card:
-            run_structure[-1] += 1
-        elif this_card == last_card + 1:
-            run_structure.append(1)
-        elif len(run_structure) >= 3:
-            break
-        else:
-            run_structure = [1]
-        last_card = this_card
-
-    if len(run_structure) >= 3:
-        number_of_runs = 1
-        for r in run_structure:
-            number_of_runs *= r
-        result = [number_of_runs, len(run_structure)]
-
-    return result
 
 def runs_in_pegging(cards_played):
     run_length = cumulative = 0
@@ -875,67 +868,119 @@ def runs_in_pegging(cards_played):
                 return len(seq)
     return run_length
 
-def flush_points(hand):
-    flush_suit = hand[0].suit
-    flush_length = len([c for c in hand if c.suit == flush_suit])
-    if flush_length == len(hand):
-        return flush_length
-    if len(hand) == 4 and flush_length == 3 and hand[-1].suit != flush_suit:
-        return 3
-    return 0
+
+class Flush:
+
+    def __init__(self, hand):
+        self.hand = hand
+        self.points = 0
+
+    def flush_points(self):
+        flush_suit = self.hand[0].suit
+        flush_length = len([c for c in self.hand if c.suit == flush_suit])
+        if flush_length == len(self.hand):
+            self.points = flush_length
+        if len(self.hand) == 4 and flush_length == 3 and self.hand[-1].suit != flush_suit:
+            self.points = 3
+        return self.points
+
+    def __str__(self):
+        numbers = {3: 'three', 4: 'four', 5: 'five'}
+        if self.points > 0:
+            return 'a flush of ' + numbers[self.points]
+        return ''
+
+
+class Runs:
+
+    def __init__(self, hand):
+        self.hand = hand
+        self.length = 0
+        self.instances = 0
+
+    def find_runs(self):
+        ranked_cards = [c.rank for c in self.hand]
+        print('Highest ranked card:', max(ranked_cards))
+        print('Lowest ranked card:', min(ranked_cards))
+        # for rank in ranked_cards:
+        #     if rank + 1 in ranked_cards and rank - 1 in ranked_cards:
+        #         print('We might have a run', ranked_cards)
+
+        result = []
+        run_structure = [1]  # for a run, will be no. of each rank in run
+        # e.g. for A,2,2,3 will be [1, 2, 1]
+        last_card = self.hand[0].rank
+        for c in self.hand[1:]:
+            this_card = c.rank
+            if this_card == last_card:
+                run_structure[-1] += 1
+            elif this_card == last_card + 1:
+                run_structure.append(1)
+            elif len(run_structure) >= 3:
+                break
+            else:
+                run_structure = [1]
+            last_card = this_card
+
+        if len(run_structure) >= 3:
+            number_of_runs = 1
+            for r in run_structure:
+                number_of_runs *= r
+            result = [number_of_runs, len(run_structure)]
+            self.instances = number_of_runs
+            self.length = len(run_structure)
+        return result
+
+    def __str__(self):
+        if self.length:
+            run_or_runs = ' run'
+            if self.instances > 1:
+                run_or_runs += 's'
+            return NUMBERS[self.instances] + run_or_runs + ' of ' + NUMBERS[self.length]
+        return ''
+
 
 def score_hand(hand):
-    score_int = 0
     score_text = ''
-    numbers = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven',
-               'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 
-               'fourteen', 'fifteen', 'sixteen']
 
     all_pairs = find_all_possible_pairs_in(hand)
 
     # how many fifteens?
-    fifteens = pair_counter(all_pairs, adds_up_to, 15) # any pairs that add up to 15?
-    for index, card in enumerate(hand[:-1]): # any triplets?
+    fifteens = pair_counter(all_pairs, adds_up_to, 15)  # any pairs that add up to 15?
+    for index, card in enumerate(hand[:-1]):  # any triplets?
         first_card_value = card.value
         pairs_to_make_triplets = find_all_possible_pairs_in(hand[index + 1:])
         fifteens += pair_counter(pairs_to_make_triplets, adds_up_to, 15 - first_card_value)
-    if len(hand) > 4: # box scenario, do any combos of four cards add up to 15?
+    if len(hand) > 4:  # box scenario, do any combos of four cards add up to 15?
         for card in hand:
             reduced_hand = hand.copy()
             reduced_hand.remove(card)
             fifteens += sum([c.value for c in reduced_hand]) == 15
-    if len(hand) > 3: # do all the cards in the hand add up to 15?
+    if len(hand) > 3:  # do all the cards in the hand add up to 15?
         fifteens += sum([c.value for c in hand]) == 15
 
     score_int = fifteens * 2
     for f in range(1, fifteens + 1):
-        score_text += what_to_append_to_score_text(score_text, numbers[15] + 
-                                                   ' ' + numbers[f*2])
+        score_text += what_to_append_to_score_text(score_text, NUMBERS[15] +
+                                                   ' ' + NUMBERS[f * 2])
 
     # Any runs?
-    sorted_hand = sorted(hand, key = lambda c: c.rank)
-    run_results = find_runs(sorted_hand)
-    if len(run_results):
-        score_int += run_results[0] * run_results[1]
-        if run_results[0] == 1:
-            score_text += what_to_append_to_score_text(score_text, 'a run of ')
-        elif run_results[0] > 1:
-            score_text += what_to_append_to_score_text(score_text, 
-                                                       numbers[run_results[0]] + ' runs of ')
-        score_text += numbers[run_results[1]]
+    sorted_hand = sorted(hand, key=lambda c: c.rank)
+    run_counter = Runs(sorted_hand)
+    run_counter.find_runs()
+    score_int += run_counter.instances * run_counter.length
+    score_text += what_to_append_to_score_text(score_text, str(run_counter))
 
     # Any flushes?
-    flush_length = flush_points(hand)
-    if flush_length > 2:
-        score_int += flush_length
-        score_text += what_to_append_to_score_text(score_text, 'a flush of ' + 
-                                                   numbers[flush_length])
+    flush_counter = Flush(hand)
+    score_int += flush_counter.flush_points()
+    score_text += what_to_append_to_score_text(score_text, str(flush_counter))
 
     # How many pairs?
     pairs = pair_counter(all_pairs, is_pair)
     score_int += pairs * 2
     if pairs > 0:
-        score_text += what_to_append_to_score_text(score_text, numbers[pairs] + ' pair')
+        score_text += what_to_append_to_score_text(score_text, NUMBERS[pairs] + ' pair')
         if pairs > 1:
             score_text += 's'
 
@@ -956,20 +1001,20 @@ def score_hand(hand):
         else:
             score_text = 'zero points'
 
-    score_text = score_text[0].upper() + score_text[1:]
-
     # slip in an 'and' at the end if there are multiple scoring types
     last_comma = score_text.rfind(',')
     if last_comma > 0:
         if 'Bob' not in score_text and not score_int == fifteens * 2:
             score_text = score_text[:last_comma] + ' and' + score_text[last_comma + 1:]
 
-    return (score_int, score_text)
+    return (score_int, score_text.capitalize())
+
 
 def what_to_append_to_score_text(score_string, latest_addition):
-    if len(score_string) > 0:
+    if len(score_string) > 0 and latest_addition:
         return ', ' + latest_addition
     return latest_addition
+
 
 if __name__ == '__main__':
     the_table = Table()
