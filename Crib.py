@@ -838,9 +838,16 @@ def is_pair(two_cards, unused_value=0):
 def adds_up_to(two_cards, target_value):
     return two_cards[0].value + two_cards[1].value == target_value
 
+def its_a_run(card_list):
+    no_of_cards = len(card_list)
+    ranks = [c.rank for c in card_list]
+    if max(ranks) == min(ranks) + no_of_cards - 1:
+        if len(set(ranks)) == no_of_cards:
+            return True
+    return False
 
 def runs_in_pegging(cards_played):
-    run_length = cumulative = 0
+    cumulative = 0
     no_of_cards = len(cards_played)
 
     if no_of_cards >= 3:
@@ -858,12 +865,15 @@ def runs_in_pegging(cards_played):
 
     no_of_cards = len(cards_played)
     if no_of_cards >= 3:
-        for l in range(no_of_cards - 2):
-            seq = [c.rank for c in cards_played[l:]]
-            if max(seq) == min(seq) + len(seq) - 1 and \
-                    len(set(seq)) == len(seq):
-                return len(seq)
-    return run_length
+        for starting_point in range(no_of_cards - 2):
+            sequence = cards_played[starting_point:]
+            if its_a_run(sequence):
+                return len(sequence)
+            # seq = [c.rank for c in cards_played[length:]]
+            # if max(seq) == min(seq) + len(seq) - 1 and \
+            #         len(set(seq)) == len(seq):
+            #     return len(seq)
+    return 0
 
 
 class Flush:
@@ -883,7 +893,7 @@ class Flush:
 
     def __str__(self):
         if self.points > 0:
-            return 'a flush of ' + NUMBERS[self.points]
+            return ', a flush of ' + NUMBERS[self.points]
         return ''
 
 
@@ -895,44 +905,23 @@ class Runs:
         self.instances = 0
 
     def find_runs(self):
-        ranked_cards = [c.rank for c in self.hand]
-        print('Highest ranked card:', max(ranked_cards))
-        print('Lowest ranked card:', min(ranked_cards))
-        # for rank in ranked_cards:
-        #     if rank + 1 in ranked_cards and rank - 1 in ranked_cards:
-        #         print('We might have a run', ranked_cards)
-
-        result = []
-        run_structure = [1]  # for a run, will be no. of each rank in run
-        # e.g. for A,2,2,3 will be [1, 2, 1]
-        last_card = self.hand[0].rank
-        for c in self.hand[1:]:
-            this_card = c.rank
-            if this_card == last_card:
-                run_structure[-1] += 1
-            elif this_card == last_card + 1:
-                run_structure.append(1)
-            elif len(run_structure) >= 3:
+        # get every combination from length of hand downwards
+        # if the whole hand is a run, can stop there
+        for run_length in range(len(self.hand), 2, -1):
+            combos = itertools.combinations(self.hand, run_length)
+            for comb in combos:
+                if its_a_run(comb):
+                    self.instances += 1
+                    self.length = run_length
+            if self.instances > 0:
                 break
-            else:
-                run_structure = [1]
-            last_card = this_card
-
-        if len(run_structure) >= 3:
-            number_of_runs = 1
-            for r in run_structure:
-                number_of_runs *= r
-            result = [number_of_runs, len(run_structure)]
-            self.instances = number_of_runs
-            self.length = len(run_structure)
-        return result
 
     def __str__(self):
         if self.length:
             run_or_runs = ' run'
             if self.instances > 1:
                 run_or_runs += 's'
-            return NUMBERS[self.instances] + run_or_runs + ' of ' + NUMBERS[self.length]
+            return ', ' + NUMBERS[self.instances] + run_or_runs + ' of ' + NUMBERS[self.length]
         return ''
 
 
@@ -957,26 +946,25 @@ def score_hand(hand):
     fifteens = Fifteens(hand).count_fifteens()
     score_int = fifteens * 2
     for f in range(1, fifteens + 1):
-        score_text += what_to_append_to_score_text(score_text, NUMBERS[15] +
-                                                   ' ' + NUMBERS[f * 2])
+        score_text += ', ' + NUMBERS[15] + ' ' + NUMBERS[f * 2]
 
     # Any runs?
     sorted_hand = sorted(hand, key=lambda c: c.rank)
     run_counter = Runs(sorted_hand)
     run_counter.find_runs()
     score_int += run_counter.instances * run_counter.length
-    score_text += what_to_append_to_score_text(score_text, str(run_counter))
+    score_text += str(run_counter)
 
     # Any flushes?
     flush_counter = Flush(hand)
     score_int += flush_counter.flush_points()
-    score_text += what_to_append_to_score_text(score_text, str(flush_counter))
+    score_text += str(flush_counter)
 
     # How many pairs?
     pairs = pair_counter(find_all_possible_pairs_in(hand), is_pair)
     score_int += pairs * 2
     if pairs > 0:
-        score_text += what_to_append_to_score_text(score_text, NUMBERS[pairs] + ' pair')
+        score_text += ', ' + NUMBERS[pairs] + ' pair'
         if pairs > 1:
             score_text += 's'
 
@@ -988,7 +976,7 @@ def score_hand(hand):
         knob = [c for c in hand[:-1] if c.rank == 11 and c.suit == hand[-1].suit]
         if len(knob) == 1:
             score_int += 1
-            score_text += what_to_append_to_score_text(score_text, 'one for his knob')
+            score_text += ', one for his knob'
 
     if score_int == 0:
         odd_card_found = len([c for c in hand if c.rank % 2 == 1])
@@ -997,19 +985,17 @@ def score_hand(hand):
         else:
             score_text = 'zero points'
 
+    if score_text[:2] == ', ':
+        score_text = score_text[2:]
+    score_text = score_text[0].upper() + score_text[1:]
+
     # slip in an 'and' at the end if there are multiple scoring types
     last_comma = score_text.rfind(',')
     if last_comma > 0:
         if 'Bob' not in score_text and not score_int == fifteens * 2:
             score_text = score_text[:last_comma] + ' and' + score_text[last_comma + 1:]
 
-    return score_int, score_text.capitalize()
-
-
-def what_to_append_to_score_text(score_string, latest_addition):
-    if len(score_string) > 0 and latest_addition:
-        return ', ' + latest_addition
-    return latest_addition
+    return score_int, score_text
 
 
 if __name__ == '__main__':
