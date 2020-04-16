@@ -6,6 +6,7 @@ Created on Tue Dec 17 08:24:44 2019
 """
 import random
 import tkinter
+import itertools
 
 HEARTS = '\u2665'
 CLUBS = '\u2663'
@@ -822,11 +823,7 @@ class Card():
 
 
 def find_all_possible_pairs_in(hand):
-    pairs = []
-    for ind, card in enumerate(hand[:-1]):
-        for c in hand[ind + 1:]:
-            pairs.append([card, c])
-    return pairs
+    return list(itertools.combinations(hand, 2))
 
 
 def pair_counter(list_of_pairs, matching_test, value=0):
@@ -885,9 +882,8 @@ class Flush:
         return self.points
 
     def __str__(self):
-        numbers = {3: 'three', 4: 'four', 5: 'five'}
         if self.points > 0:
-            return 'a flush of ' + numbers[self.points]
+            return 'a flush of ' + NUMBERS[self.points]
         return ''
 
 
@@ -940,25 +936,25 @@ class Runs:
         return ''
 
 
+class Fifteens:
+
+    def __init__(self, hand):
+        self.hand = hand
+        self.fifteens = 0
+
+    def count_fifteens(self):
+        for combo_length in range(2, len(self.hand) + 1):
+            for combo in itertools.combinations(self.hand, combo_length):
+                if sum([card.value for card in list(combo)]) == 15:
+                    self.fifteens += 1
+        return self.fifteens
+
+
 def score_hand(hand):
     score_text = ''
 
-    all_pairs = find_all_possible_pairs_in(hand)
-
     # how many fifteens?
-    fifteens = pair_counter(all_pairs, adds_up_to, 15)  # any pairs that add up to 15?
-    for index, card in enumerate(hand[:-1]):  # any triplets?
-        first_card_value = card.value
-        pairs_to_make_triplets = find_all_possible_pairs_in(hand[index + 1:])
-        fifteens += pair_counter(pairs_to_make_triplets, adds_up_to, 15 - first_card_value)
-    if len(hand) > 4:  # box scenario, do any combos of four cards add up to 15?
-        for card in hand:
-            reduced_hand = hand.copy()
-            reduced_hand.remove(card)
-            fifteens += sum([c.value for c in reduced_hand]) == 15
-    if len(hand) > 3:  # do all the cards in the hand add up to 15?
-        fifteens += sum([c.value for c in hand]) == 15
-
+    fifteens = Fifteens(hand).count_fifteens()
     score_int = fifteens * 2
     for f in range(1, fifteens + 1):
         score_text += what_to_append_to_score_text(score_text, NUMBERS[15] +
@@ -977,7 +973,7 @@ def score_hand(hand):
     score_text += what_to_append_to_score_text(score_text, str(flush_counter))
 
     # How many pairs?
-    pairs = pair_counter(all_pairs, is_pair)
+    pairs = pair_counter(find_all_possible_pairs_in(hand), is_pair)
     score_int += pairs * 2
     if pairs > 0:
         score_text += what_to_append_to_score_text(score_text, NUMBERS[pairs] + ' pair')
@@ -1007,7 +1003,7 @@ def score_hand(hand):
         if 'Bob' not in score_text and not score_int == fifteens * 2:
             score_text = score_text[:last_comma] + ' and' + score_text[last_comma + 1:]
 
-    return (score_int, score_text.capitalize())
+    return score_int, score_text.capitalize()
 
 
 def what_to_append_to_score_text(score_string, latest_addition):
