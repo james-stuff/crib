@@ -17,7 +17,7 @@ WIN_SCORE = 121
 NUMBERS = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven',
            'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen',
            'fourteen', 'fifteen', 'sixteen']
-VERSION = '2.1.0'
+VERSION = '2.1.1'
 
 
 def make_spacer(owner_frame, text_string, column, min_size):
@@ -191,9 +191,49 @@ class ButtonList():
             del (self.clickable_cards[index])
 
 
+class RoundTextInterface():
+    def __init__(self):
+        self.log_file = open('MonteCarloOutput' + VERSION + '.txt', 'a', encoding='utf-8')
+
+    def update_score_info(self, info_to_display):
+        if len(info_to_display) > 0:
+            self.log_file.writelines(info_to_display + '\n')
+
+    def update_pegs(self, whose_turn, points_to_add, back_peg_moves=True):
+        return 0
+
+    def update_ctrl_btn_text(self, button_text):
+        pass
+    
+    def wait_for_ctrl_btn_click(self, blah):
+        pass
+
+
+class RoundVisualInterface(RoundTextInterface):
+    def __init__(self, table):
+        super().__init__()
+        self.table = table
+
+    def update_pegs(self, whose_turn, points_to_add, back_peg_moves=True):
+        return self.table.peg_board.increment_row_by(whose_turn, points_to_add, back_peg_moves)
+
+    def update_score_info(self, info_to_display):
+        self.table.score_info.set(info_to_display)
+        self.table.l_score.grid(row=2, pady=2)
+        self.table.l_score.configure(bg='cyan')  # self.button_colour)
+        if len(info_to_display) == 0:
+            self.table.l_score.configure(bg='green')
+
+    def update_ctrl_btn_text(self, button_text):
+        self.table.btControl.configure(text=button_text)
+        
+    def wait_for_ctrl_btn_click(self, button_text):
+        self.table.await_control_button_click(button_text)
+
+
 class Round():
-    def __init__(self, game=None, cards=[], comp_cards=[]):
-        self.real_mode = False
+    def __init__(self, game=None, cards=None, comp_cards=None):
+        self.game = game
 
         # gameplay variables:
         self.my_cards = cards
@@ -210,10 +250,7 @@ class Round():
         self.computer = SmartComputer(self)
         self.who_has_it = {True: 'You have', False: 'Computer has'}
 
-        if isinstance(game, Game):
-            self.real_mode = True
-            self.game = game
-
+        if self.game is not None:
             self.card_var = tkinter.IntVar()
             self.card_var.set(0)
 
@@ -252,9 +289,9 @@ class Round():
             self.b_my_cards[4].configure(command=lambda: self.card_var.set(4))
 
             self.button_colour = self.b_my_cards[0].cget('bg')
+            self.interface = RoundVisualInterface(self.game.table)
         else:
-            self.output_file = open('MonteCarloOutput' + VERSION + '.txt',
-                                    'a', encoding='utf-8')
+            self.interface = RoundTextInterface()
 
     def await_card_click(self):
         ''' wait for player to click a card.  Tell me the index of the card chosen'''
@@ -263,34 +300,13 @@ class Round():
             self.b_my_cards[0].wait_variable(self.card_var)
         return self.card_var.get()
 
-    def update_score_info(self, info_to_display):
-        ''' update label on table, or print to console if in test mode '''
-        if self.real_mode:
-            self.game.table.score_info.set(info_to_display)
-            self.game.table.l_score.grid(row=2, pady=2)
-            self.game.table.l_score.configure(bg=self.button_colour)
-            if len(info_to_display) == 0:
-                self.game.table.l_score.configure(bg='green')
-        elif len(info_to_display) > 0:
-            self.output_file.writelines(info_to_display + '\n')
-
-    def ui_btn_update(self, button_text):
-        ''' change what is written on the control button'''
-        if self.real_mode:
-            self.game.table.btControl.configure(text=button_text)
-
-    def ui_wait_for_click(self, button_text):
-        ''' change the text on the control button and wait for user to click it '''
-        if self.real_mode:
-            self.game.table.await_control_button_click(button_text)
-
     def ui_wait_for_card(self):
         ''' wait for the player to select a card, and tell me what they've chosen'''
         clickable_card = self.await_card_click()
         return self.btn_player_hand.clickable_cards.index(clickable_card)
 
     def ui_transfer_card_to_box(self, card_index):
-        if self.real_mode:
+        if self.game is not None:
             cards_in_box = len(self.box)
             self.btn_box.show_cards(cards_in_box - 1, True)
             if self.is_players_turn:
@@ -299,7 +315,7 @@ class Round():
                 self.btn_comp_hand.destroy_cards(0)
 
     def ui_update_played_cards(self):
-        if self.real_mode:
+        if self.game is not None:
             no_of_cards_down = len(self.played_cards)
             if no_of_cards_down > 1:
                 if self.turn_over_played_cards_on_next_turn:
@@ -311,16 +327,9 @@ class Round():
                                                                         height=5)
             self.btn_played.show_cards(no_of_cards_down - 1)
 
-    def ui_pegging(self, whose_turn, points_to_add, back_peg_moves=True):
-        if self.real_mode:
-            return self.game.table.peg_board.increment_row_by(whose_turn,
-                                                              points_to_add,
-                                                              back_peg_moves)
-        return 0
-
     def play_round(self):
         self.deal()
-        if not self.real_mode:
+        if self.game is None:
             self.player_has_box = random.randrange(2)
         self.is_players_turn = not self.player_has_box
 
@@ -330,19 +339,19 @@ class Round():
         self.hand_display(not self.player_has_box)
         self.hand_display(self.player_has_box)
         self.hand_display(self.player_has_box, is_box=True)
-        if self.real_mode and self.game.win_detected:
-            self.ui_wait_for_click('Start new game')
+        if self.game is not None and self.game.win_detected:
+            self.interface.wait_for_ctrl_btn_click('Start new game')
             self.btn_face_up.show_cards(face_down=True)
-        if not self.real_mode:
-            self.output_file.close()
+        if self.game is None:
+            self.interface.log_file.close()
 
     def deal(self):
-        if len(self.my_cards) == 0:
+        if self.my_cards is None:
             self.my_cards = self.the_pack.deal(5)
-        if len(self.comp_cards) == 0:
+        if self.comp_cards is None:
             self.comp_cards = self.the_pack.deal(5)
 
-        if self.real_mode:
+        if self.game is not None:
             self.btn_player_hand.populate(self.my_cards)
             self.btn_player_hand.show_cards()
             self.btn_comp_hand.populate(self.comp_cards)
@@ -350,16 +359,16 @@ class Round():
 
     def build_box(self):
         who_has_box = self.who_has_it[self.player_has_box] + ' the box'
-        self.update_score_info(who_has_box)
+        self.interface.update_score_info(who_has_box)
 
         while len(self.box) < 4:
             if self.is_players_turn:
                 initial_box_size = len(self.box)
                 box_string = ''
                 while len(self.box) < initial_box_size + 2:
-                    if self.real_mode:
-                        self.ui_btn_update('Click on two cards to add them ' +
-                                           'to the box')
+                    if self.game is not None:
+                        self.interface.update_ctrl_btn_text('Click on two cards to add them ' +
+                                                            'to the box')
                         card_for_box = self.my_cards[self.ui_wait_for_card()]
                     else:
                         card_for_box = self.my_cards[-1]
@@ -369,13 +378,13 @@ class Round():
                     del (self.my_cards[ind])
                     box_string += str(card_for_box)
                     if len(box_string) < 4:
-                        self.update_score_info('Card added to box: ' + box_string)
+                        self.interface.update_score_info('Card added to box: ' + box_string)
                     self.ui_transfer_card_to_box(ind)
-                self.update_score_info('Cards added to box: ' + box_string)
+                self.interface.update_score_info('Cards added to box: ' + box_string)
                 self.is_players_turn = False
             else:
                 # computer adds two cards to the box
-                self.ui_wait_for_click('Add cards to box for computer')
+                self.interface.wait_for_ctrl_btn_click('Add cards to box for computer')
                 discards = self.computer.two_cards_for_box(self.comp_cards)
                 #                print('computer discards:', [str(d) for d in discards])
                 #                print('computer still has:', [str(x) for x in self.comp_cards])
@@ -383,25 +392,25 @@ class Round():
                     self.comp_cards.remove(disc)
                     self.box.append(disc)
                     self.ui_transfer_card_to_box(disc)
-                    if not self.real_mode:
-                        self.update_score_info('Computer adds ' + str(disc) +
-                                               ' to box')
-                self.update_score_info('')
+                    # if not self.real_mode:
+                    self.interface.update_score_info('Computer adds ' + str(disc) +
+                                                     ' to box')
+                self.interface.update_score_info('')
                 self.is_players_turn = True
 
     def turn_up_top_card(self):
         # Turn up the next card, Two for his heels check:
         self.face_up_card = self.the_pack.deal(1)[0]
-        if self.real_mode:
+        if self.game is not None:
             self.btn_face_up.populate([self.face_up_card])
             self.btn_face_up.show_cards()
         else:
-            self.update_score_info('Card turned up: ' + str(self.face_up_card))
+            self.interface.update_score_info('Card turned up: ' + str(self.face_up_card))
         if self.face_up_card.rank == 11:
             heels_notification = 'Two for his heels!'
-            updated_score = self.ui_pegging(self.player_has_box, 2)
+            updated_score = self.interface.update_pegs(self.player_has_box, 2)
             heels_notification += self.check_for_win(self.player_has_box, updated_score)
-            self.update_score_info(heels_notification)
+            self.interface.update_score_info(heels_notification)
 
     def pegging_round(self):
         while len(self.played_cards) < 6:
@@ -431,12 +440,12 @@ class Round():
     def check_if_knock_required(self):
         if not self.can_go():
             if self.is_players_turn:
-                self.ui_wait_for_click('Knock')
+                self.interface.wait_for_ctrl_btn_click('Knock')
                 self.player_knock = True
             else:
                 self.comp_knock = True
-                self.update_score_info(self.last_score_comment +
-                                       '\tComputer knocks.')
+                self.interface.update_score_info(self.last_score_comment +
+                                                 '\tComputer knocks.')
 
     def can_go(self):
         turn_dict = {True: self.my_cards, False: self.comp_cards}
@@ -448,15 +457,15 @@ class Round():
         return self.running_total + card.value <= 31
 
     def player_picks_card(self):
-        self.ui_btn_update('It\'s your turn!  Click a card to play it')
-        if self.real_mode:
+        self.interface.update_ctrl_btn_text('It\'s your turn!  Click a card to play it')
+        if self.game is not None:
             card_ok = False
             while not card_ok:
                 card_index = self.ui_wait_for_card()
                 selected_card = self.my_cards[card_index]
                 card_ok = self.can_play_card(selected_card)
                 if not card_ok:
-                    self.update_score_info('Cannot play this card, too high.')
+                    self.interface.update_score_info('Cannot play this card, too high.')
             self.btn_player_hand.destroy_cards(card_index, False)
         else:
             available_cards = [c for c in self.my_cards if c not in self.played_cards]
@@ -467,8 +476,8 @@ class Round():
         return selected_card
 
     def computer_picks_card(self):
-        self.ui_wait_for_click('Computer\'s turn')
-        if self.real_mode:
+        self.interface.wait_for_ctrl_btn_click('Computer\'s turn')
+        if self.game is not None:
             # remove the right-most computer card button from screen:
             comp_cards_left = 2
             for cd in self.comp_cards:
@@ -483,7 +492,7 @@ class Round():
         run_tot_text = str(self.running_total)
         self.update_round_state_with_played_card(card_played)
         turn_score = self.points_scored_by_played_card()
-        total_score = self.ui_pegging(self.is_players_turn, turn_score)
+        total_score = self.interface.update_pegs(self.is_players_turn, turn_score)
 
         if self.running_total == 31:
             for_text = self.congratulations_on_getting_31()
@@ -497,11 +506,11 @@ class Round():
 
         score_string = run_tot_text + for_text + win_str
         self.last_score_comment = score_string
-        if not self.real_mode:
+        if self.game is None:
             dict_who = {True: 'Player  ', False: 'Computer'}
             player = dict_who[self.is_players_turn]
             score_string = player + ' : ' + str(card_played) + '\t' + score_string
-        self.update_score_info(score_string)
+        self.interface.update_score_info(score_string)
 
     def update_round_state_with_played_card(self, card_played):
         self.played_cards.append(card_played)
@@ -545,9 +554,9 @@ class Round():
             last_score = int(self.last_score_comment[start_of_for + 4:start_of_for + 6])
             last_score += 1
             score_string = self.last_score_comment[:start_of_for + 6].rstrip() + ' and a go is ' + str(last_score)
-            updated_score = self.ui_pegging(player_gets_go_point, 1, False)
+            updated_score = self.interface.update_pegs(player_gets_go_point, 1, False)
         else:
-            updated_score = self.ui_pegging(player_gets_go_point, 1)
+            updated_score = self.interface.update_pegs(player_gets_go_point, 1)
             score_string = str(self.running_total) + ' for 1'
 
         if just_won:
@@ -555,11 +564,11 @@ class Round():
         else:
             score_string += self.check_for_win(player_gets_go_point, updated_score)
 
-        self.update_score_info(score_string)
+        self.interface.update_score_info(score_string)
 
     def check_for_win(self, player_just_scored, score):
         congrats = ''
-        if self.real_mode:
+        if self.game is not None:
             if score >= WIN_SCORE and not self.game.win_detected:
                 self.game.win_detected = True
                 congrats = ' -- ' + self.who_has_it[player_just_scored].upper() + ' WON!!!'
@@ -576,29 +585,29 @@ class Round():
         if is_player:
             card_list = self.my_cards
             owner = 'my'
-            if self.real_mode:
+            if self.game is not None:
                 button_list = self.btn_player_hand
         else:
             card_list = self.comp_cards
             owner = 'computer\'s'
-            if self.real_mode:
+            if self.game is not None:
                 button_list = self.btn_comp_hand
 
         if is_box:
             hand_or_box = ' box'
             card_list = self.box
-            if self.real_mode:
+            if self.game is not None:
                 button_list = self.btn_box
         else:
             hand_or_box = ' hand'
 
-        self.ui_wait_for_click('Show ' + owner + hand_or_box)
+        self.interface.wait_for_ctrl_btn_click('Show ' + owner + hand_or_box)
         int_score, text_score = score_hand(card_list + [self.face_up_card])
         str_info = text_score + ' is ' + str(int_score)
-        if not self.real_mode:
+        if self.game is None:
             str_info = str([str(c) for c in card_list]) + str_info
 
-        if self.real_mode:
+        if self.game is not None:
             # clear the played cards (and if appropriate, hands), before displaying the cards:
             self.btn_played.destroy_cards()
             if is_box:
@@ -606,9 +615,9 @@ class Round():
                 self.btn_comp_hand.destroy_cards()
             button_list.show_cards()
 
-        new_score = self.ui_pegging(is_player, int_score)
+        new_score = self.interface.update_pegs(is_player, int_score)
         str_info += self.check_for_win(is_player, new_score)
-        self.update_score_info(str_info)
+        self.interface.update_score_info(str_info)
 
 
 class SmartComputer():
@@ -838,6 +847,7 @@ def is_pair(two_cards, unused_value=0):
 def adds_up_to(two_cards, target_value):
     return two_cards[0].value + two_cards[1].value == target_value
 
+
 def its_a_run(card_list):
     no_of_cards = len(card_list)
     ranks = [c.rank for c in card_list]
@@ -845,6 +855,7 @@ def its_a_run(card_list):
         if len(set(ranks)) == no_of_cards:
             return True
     return False
+
 
 def runs_in_pegging(cards_played):
     cumulative = 0

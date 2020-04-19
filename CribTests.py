@@ -96,21 +96,21 @@ class CribTest(unittest.TestCase):
     def testFlushInBox(self):
         hand = [Crib.Card(10, CLUBS), Crib.Card(3, CLUBS), Crib.Card(6, CLUBS),
                 Crib.Card(12, CLUBS), Crib.Card(13, CLUBS)]
-        score = Crib.score_hand(hand, True)
+        score = Crib.score_hand(hand)
         self.assertEqual(score[0], 5)
         print(score[1])
         
     def testNotAFlushInBox(self):
         hand = [Crib.Card(10, CLUBS), Crib.Card(3, CLUBS), Crib.Card(6, CLUBS),
                 Crib.Card(12, CLUBS), Crib.Card(13, HEARTS)]
-        score = Crib.score_hand(hand, True)
+        score = Crib.score_hand(hand)
         self.assertEqual(score[0], 0)
         print(score[1])
         
     def testDefinitelyNotAFlushInBox(self):
         hand = [Crib.Card(10, CLUBS), Crib.Card(3, SPADES), Crib.Card(6, CLUBS),
                 Crib.Card(12, CLUBS), Crib.Card(13, CLUBS)]
-        score = Crib.score_hand(hand, True)
+        score = Crib.score_hand(hand)
         self.assertEqual(score[0], 0)
         print(score[1])
         
@@ -133,7 +133,7 @@ class CribTest(unittest.TestCase):
     def testTwentyNine(self):
         hand = [Crib.Card(11, CLUBS), Crib.Card(5, DIAMONDS), 
                 Crib.Card(5, HEARTS), Crib.Card(5, SPADES), Crib.Card(5, CLUBS)]
-        score = Crib.score_hand(hand, True)
+        score = Crib.score_hand(hand)
         self.assertEqual(score[0], 29)
         print(score[1])
         
@@ -166,9 +166,31 @@ class CribTest(unittest.TestCase):
         # shouldn't give one for his knob
         hand = [Crib.Card(7, SPADES), Crib.Card(7, HEARTS), 
                 Crib.Card(7, SPADES), Crib.Card(7, SPADES), Crib.Card(7, SPADES)]
-        score = Crib.score_hand(hand, True)
+        score = Crib.score_hand(hand)
         self.assertEqual(score[0], 20)
         print(score)
+        
+    def testRunsSimple(self):
+        hand = [Crib.Card(11, HEARTS), Crib.Card(10, CLUBS), 
+                Crib.Card(12, HEARTS), Crib.Card(3, CLUBS)]
+        score = Crib.score_hand(hand)
+        self.assertEqual(score[0], 3)
+        print('RunsSimple', score)
+        
+    def testTwoRunsOfFour(self):
+        hand = [Crib.Card(11, HEARTS), Crib.Card(10, CLUBS), 
+                Crib.Card(12, HEARTS), Crib.Card(11, CLUBS),
+                Crib.Card(9, DIAMONDS)]
+        score = Crib.score_hand(hand)
+        self.assertEqual(score[0], 10)
+        print('FourRuns', score)
+        
+    def testNoRuns(self):
+        hand = [Crib.Card(11, HEARTS), Crib.Card(10, CLUBS), 
+                Crib.Card(7, HEARTS), Crib.Card(3, CLUBS)]
+        score = Crib.score_hand(hand)
+        self.assertEqual(score[0], 0)
+        print('NoRuns', score)
         
      # NB for these tests, both players put last two cards in list in box, 
     # then player plays 2, 1, 0 and computer 0, 1, 2 in their remaining card lists
@@ -178,7 +200,7 @@ class CribTest(unittest.TestCase):
         comp = [Crib.Card(11, CLUBS), Crib.Card(10, DIAMONDS), 
                 Crib.Card(12, HEARTS), Crib.Card(13, SPADES), Crib.Card(11, CLUBS)]
         crib_round = Crib.Round(game=None, cards=player, comp_cards=comp)
-        crib_round.update_score_info('=== testBoxCreation ===')
+        crib_round.interface.update_score_info('=== testBoxCreation ===')
         crib_round.play_round()
         print('=' * 23)
         
@@ -188,14 +210,14 @@ class CribTest(unittest.TestCase):
         comp = [Crib.Card(12, CLUBS), Crib.Card(2, SPADES), 
                 Crib.Card(2, HEARTS), Crib.Card(13, SPADES), Crib.Card(11, CLUBS)]
         crib_round = Crib.Round(game=None, cards=player, comp_cards=comp)
-        crib_round.update_score_info('=== testDozenInPairsPegging ===')
+        crib_round.interface.update_score_info('=== testDozenInPairsPegging ===')
         crib_round.play_round()
         print('=' * 23)
         
     def testMonteCarloPeggingRounds(self):
         for monte_carlo in range(10):
             next_round = Crib.Round()
-            next_round.update_score_info('=== Monte Carlo round ' + 
+            next_round.interface.update_score_info('=== Monte Carlo round ' +
                                          str(monte_carlo).rjust(6) + '===')
             next_round.play_round()
             
