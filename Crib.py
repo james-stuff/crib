@@ -869,10 +869,6 @@ def runs_in_pegging(cards_played):
             sequence = cards_played[starting_point:]
             if its_a_run(sequence):
                 return len(sequence)
-            # seq = [c.rank for c in cards_played[length:]]
-            # if max(seq) == min(seq) + len(seq) - 1 and \
-            #         len(set(seq)) == len(seq):
-            #     return len(seq)
     return 0
 
 
