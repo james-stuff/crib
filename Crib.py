@@ -17,7 +17,7 @@ WIN_SCORE = 121
 NUMBERS = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven',
            'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen',
            'fourteen', 'fifteen', 'sixteen']
-VERSION = '2.1.1'
+VERSION = '2.1.2'
 
 
 def make_spacer(owner_frame, text_string, column, min_size):
@@ -28,9 +28,7 @@ def make_spacer(owner_frame, text_string, column, min_size):
         owner_frame.grid_columnconfigure(column, minsize=min_size)
 
 
-class Table():
-    colour_dict = {CLUBS: 'black', SPADES: 'black', HEARTS: 'red',
-                   DIAMONDS: 'red'}
+class Table:
 
     def __init__(self):
         self.gui = tkinter.Tk()
@@ -67,10 +65,10 @@ class Table():
                                               height=29, width=1,
                                               relief='raised'))
             l_pack_cards[-1].grid(column=1 + n, row=0, sticky='w')
-        self.bt_blank_card = tkinter.Button(self.frame_list[0],
-                                            font=('Arial Bold', 20),
-                                            height=3, width=3)
-        self.bt_blank_card.grid(column=5, row=0, pady=10)
+        # self.bt_blank_card = tkinter.Button(self.frame_list[0],
+        #                                     font=('Arial Bold', 20),
+        #                                     height=3, width=3)
+        # self.bt_blank_card.grid(column=5, row=0, pady=10)
 
         make_spacer(self.frame_list[0], '-', 0, 0)
         make_spacer(self.frame_list[0], 20 * '-', 6, 20)
@@ -91,6 +89,12 @@ class Table():
                                   tkinter.Label(info_frame))
 
         make_spacer(self.frame_list[2], 39 * '-', 0, 0)
+
+        # NEW 20/04: create player card buttons:
+        self.player_card_buttons = [CardButton(self, None, self.frame_list[2], n, 2) for n in range(5)]
+        self.face_up_card_buttons = [CardButton(self, None, self.frame_list[0], -1, 5)]
+        self.face_up_card_buttons[0].show()
+        self.played_cards_buttons = [CardButton(self, None, self.frame_list[1], -1, 12) for n in range(6)]
 
         self.card_var = tkinter.IntVar()
 
@@ -115,7 +119,34 @@ class Table():
                 break
 
 
-class Game():
+class CardButton:
+    colour_dict = {CLUBS: 'black', SPADES: 'black', HEARTS: 'red',
+                   DIAMONDS: 'red'}
+
+    def __init__(self, table, card, frame, index, col_start):
+        self.table = table
+        self.card = card
+        self.button = tkinter.Button(frame, font=('Arial Bold', 20), height=3, width=3)
+        self.clickable_button_id = index
+        self.disp_column = col_start + index
+
+    def make_clickable(self):
+        self.button.configure(command=lambda: self.table.card_var.set(self.clickable_button_id))
+
+    def show(self, face_up=False):
+        card_text = ''
+        if face_up:
+            card_text = str(self.card)
+            self.button.configure(fg=self.colour_dict[self.card.suit])
+        self.button.configure(text=card_text)
+        self.button.grid(row=0, column=self.disp_column, pady=10)
+
+    def hide(self):
+        self.button.configure(text='')
+        self.button.grid_forget()
+
+
+class Game:
     def __init__(self, table):
         self.table = table
 
@@ -191,36 +222,64 @@ class ButtonList():
             del (self.clickable_cards[index])
 
 
-class RoundTextInterface():
+class RoundInterface():
+    def update_pegs(self, whose_turn, points_to_add, back_peg_moves=True):
+        return 0
+
+    def update_played_cards(self, cards):
+        pass
+
+    def update_ctrl_btn_text(self, button_text):
+        pass
+
+    def wait_for_ctrl_btn_click(self, blah):
+        pass
+
+    def wait_for_card(self):
+        pass
+
+
+class RoundTestInterface(RoundInterface):
     def __init__(self):
+        super().__init__()
         self.log_file = open('MonteCarloOutput' + VERSION + '.txt', 'a', encoding='utf-8')
 
     def update_score_info(self, info_to_display):
         if len(info_to_display) > 0:
             self.log_file.writelines(info_to_display + '\n')
 
-    def update_pegs(self, whose_turn, points_to_add, back_peg_moves=True):
-        return 0
-
-    def update_ctrl_btn_text(self, button_text):
-        pass
-    
-    def wait_for_ctrl_btn_click(self, blah):
-        pass
+    def wait_for_card(self):
+        return -1
 
 
-class RoundVisualInterface(RoundTextInterface):
+class RoundVisualInterface(RoundInterface):
     def __init__(self, table):
         super().__init__()
         self.table = table
+        self.button_colour = table.btControl.cget('bg')
 
     def update_pegs(self, whose_turn, points_to_add, back_peg_moves=True):
         return self.table.peg_board.increment_row_by(whose_turn, points_to_add, back_peg_moves)
 
+    def update_played_cards(self, played_cards):
+        no_of_cards_down = len(played_cards)
+        if no_of_cards_down > 1:
+            if self.turn_over_played_cards_on_next_turn:
+                # this means 31 or double-knock, so clear previously-played cards here:
+                [cb.show(face_up=False) for cb in self.table.played_cards_buttons[:no_of_cards_down]]
+                # self.btn_played.show_cards(face_down=True)
+                self.turn_over_played_cards_on_next_turn = False
+            self.btn_played.buttons[no_of_cards_down - 2].configure(width=2,
+                                                                    font=('Arial Bold', 12), anchor='nw',
+                                                                    height=5)
+        # self.btn_played.show_cards(no_of_cards_down - 1)
+        self.table.played_cards_buttons[no_of_cards_down - 1].card = played_cards[-1]
+        self.table.played_cards_buttons[no_of_cards_down - 1].show(face_up=True)
+
     def update_score_info(self, info_to_display):
         self.table.score_info.set(info_to_display)
         self.table.l_score.grid(row=2, pady=2)
-        self.table.l_score.configure(bg='cyan')  # self.button_colour)
+        self.table.l_score.configure(bg=self.button_colour)
         if len(info_to_display) == 0:
             self.table.l_score.configure(bg='green')
 
@@ -230,8 +289,17 @@ class RoundVisualInterface(RoundTextInterface):
     def wait_for_ctrl_btn_click(self, button_text):
         self.table.await_control_button_click(button_text)
 
+    def wait_for_card(self):
+        self.table.card_var.set(-1)
+        while self.table.card_var.get() < 0 or self.table.card_var.get() > 4:
+            self.table.btControl.wait_variable(self.table.card_var)
+        our_card_number = self.table.card_var.get()
+        poss_card = [c for c in self.table.player_card_buttons if c.clickable_button_id == our_card_number]
+        print(f'Card no. {our_card_number} was clicked, the {str(poss_card[0].card)}')
+        return poss_card[0].card
 
-class Round():
+
+class Round:
     def __init__(self, game=None, cards=None, comp_cards=None):
         self.game = game
 
@@ -246,7 +314,7 @@ class Round():
         self.turn_over_played_cards_on_next_turn = False
         self.last_score_comment = ''
         self.the_pack = Pack()
-        self.face_up_card = Card(0, '')
+        self.face_up_card = None#Card(0, '')
         self.computer = SmartComputer(self)
         self.who_has_it = {True: 'You have', False: 'Computer has'}
 
@@ -254,12 +322,12 @@ class Round():
             self.card_var = tkinter.IntVar()
             self.card_var.set(0)
 
-            self.b_my_cards = []
+            # self.b_my_cards = []
             self.b_comp_cards = []
-            self.b_played_cards = []
+            # self.b_played_cards = []
             self.b_comp_box = []
             self.b_my_box = []
-            self.b_face_up = []
+            # self.b_face_up = []
 
             self.player_has_box = self.game.player_has_box
             tbl = self.game.table
@@ -270,28 +338,27 @@ class Round():
                 target_box = self.b_comp_box
                 frame = 1
             self.btn_box = ButtonList(tbl, self.box, target_box, frame, 21, 4)
-            self.btn_played = ButtonList(tbl, self.played_cards,
-                                         self.b_played_cards, 1, 12, 6)
-            self.btn_player_hand = ButtonList(tbl, self.my_cards, self.b_my_cards,
-                                              2, 2, 5)
+            # self.btn_played = ButtonList(tbl, self.played_cards,
+            #                              self.b_played_cards, 1, 12, 6)
+            # self.btn_player_hand = ButtonList(tbl, self.my_cards, self.b_my_cards,
+            #                                   2, 2, 5)
             self.btn_comp_hand = ButtonList(tbl, self.comp_cards,
                                             self.b_comp_cards, 0, 7, 5)
-            tbl.bt_blank_card.grid_forget()
-            self.btn_face_up = ButtonList(tbl, [self.face_up_card],
-                                          self.b_face_up, 0, 5, 1)
-            self.btn_face_up.show_cards(0, True)
+            # tbl.bt_blank_card.grid_forget()
+            # self.btn_face_up = ButtonList(tbl, [self.face_up_card],
+            #                               self.b_face_up, 0, 5, 1)
+            # self.btn_face_up.show_cards(0, True)
 
             # hard-coding: surely there's a better way to do this?
-            self.b_my_cards[0].configure(command=lambda: self.card_var.set(0))
-            self.b_my_cards[1].configure(command=lambda: self.card_var.set(1))
-            self.b_my_cards[2].configure(command=lambda: self.card_var.set(2))
-            self.b_my_cards[3].configure(command=lambda: self.card_var.set(3))
-            self.b_my_cards[4].configure(command=lambda: self.card_var.set(4))
+            # self.b_my_cards[0].configure(command=lambda: self.card_var.set(0))
+            # self.b_my_cards[1].configure(command=lambda: self.card_var.set(1))
+            # self.b_my_cards[2].configure(command=lambda: self.card_var.set(2))
+            # self.b_my_cards[3].configure(command=lambda: self.card_var.set(3))
+            # self.b_my_cards[4].configure(command=lambda: self.card_var.set(4))
 
-            self.button_colour = self.b_my_cards[0].cget('bg')
             self.interface = RoundVisualInterface(self.game.table)
         else:
-            self.interface = RoundTextInterface()
+            self.interface = RoundTestInterface()
 
     def await_card_click(self):
         ''' wait for player to click a card.  Tell me the index of the card chosen'''
@@ -305,12 +372,14 @@ class Round():
         clickable_card = self.await_card_click()
         return self.btn_player_hand.clickable_cards.index(clickable_card)
 
-    def ui_transfer_card_to_box(self, card_index):
+    def ui_transfer_card_to_box(self, card):#_index):
+        # TODO: move to interface class
         if self.game is not None:
             cards_in_box = len(self.box)
             self.btn_box.show_cards(cards_in_box - 1, True)
             if self.is_players_turn:
-                self.btn_player_hand.destroy_cards(card_index)
+                # self.btn_player_hand.destroy_cards(card_index)
+                [cb.hide() for cb in self.game.table.player_card_buttons if cb.card == card]
             else:
                 self.btn_comp_hand.destroy_cards(0)
 
@@ -352,8 +421,13 @@ class Round():
             self.comp_cards = self.the_pack.deal(5)
 
         if self.game is not None:
-            self.btn_player_hand.populate(self.my_cards)
-            self.btn_player_hand.show_cards()
+            # self.btn_player_hand.populate(self.my_cards)
+            # self.btn_player_hand.show_cards()
+            for ind, cb in enumerate(self.game.table.player_card_buttons):
+                cb.card = self.my_cards[ind]
+                cb.make_clickable()
+                cb.show(face_up=True)
+
             self.btn_comp_hand.populate(self.comp_cards)
             self.btn_comp_hand.show_cards(face_down=True)
 
@@ -366,12 +440,8 @@ class Round():
                 initial_box_size = len(self.box)
                 box_string = ''
                 while len(self.box) < initial_box_size + 2:
-                    if self.game is not None:
-                        self.interface.update_ctrl_btn_text('Click on two cards to add them ' +
-                                                            'to the box')
-                        card_for_box = self.my_cards[self.ui_wait_for_card()]
-                    else:
-                        card_for_box = self.my_cards[-1]
+                    self.interface.update_ctrl_btn_text('Click on two cards to add them to the box')
+                    card_for_box = self.interface.wait_for_card() #self.my_cards[self.interface.wait_for_card()]
                     self.box.append(card_for_box)
                     # find and remove the card from player's hand
                     ind = self.my_cards.index(card_for_box)
@@ -379,20 +449,17 @@ class Round():
                     box_string += str(card_for_box)
                     if len(box_string) < 4:
                         self.interface.update_score_info('Card added to box: ' + box_string)
-                    self.ui_transfer_card_to_box(ind)
+                    self.ui_transfer_card_to_box(card_for_box)
                 self.interface.update_score_info('Cards added to box: ' + box_string)
                 self.is_players_turn = False
             else:
                 # computer adds two cards to the box
                 self.interface.wait_for_ctrl_btn_click('Add cards to box for computer')
                 discards = self.computer.two_cards_for_box(self.comp_cards)
-                #                print('computer discards:', [str(d) for d in discards])
-                #                print('computer still has:', [str(x) for x in self.comp_cards])
                 for disc in discards:
                     self.comp_cards.remove(disc)
                     self.box.append(disc)
                     self.ui_transfer_card_to_box(disc)
-                    # if not self.real_mode:
                     self.interface.update_score_info('Computer adds ' + str(disc) +
                                                      ' to box')
                 self.interface.update_score_info('')
@@ -402,8 +469,10 @@ class Round():
         # Turn up the next card, Two for his heels check:
         self.face_up_card = self.the_pack.deal(1)[0]
         if self.game is not None:
-            self.btn_face_up.populate([self.face_up_card])
-            self.btn_face_up.show_cards()
+            # self.btn_face_up.populate([self.face_up_card])
+            # self.btn_face_up.show_cards()
+            self.game.table.face_up_card_buttons[0].card = self.face_up_card
+            self.game.table.face_up_card_buttons[0].show(face_up=True)
         else:
             self.interface.update_score_info('Card turned up: ' + str(self.face_up_card))
         if self.face_up_card.rank == 11:
@@ -424,7 +493,8 @@ class Round():
 
             if type(card_to_play) == Card:
                 self.play_card(card_to_play)
-                self.ui_update_played_cards()
+                self.interface.update_played_cards(self.played_cards)
+                # self.ui_update_played_cards()
             self.is_players_turn = not self.is_players_turn
 
             # when to reset to zero:
@@ -461,12 +531,12 @@ class Round():
         if self.game is not None:
             card_ok = False
             while not card_ok:
-                card_index = self.ui_wait_for_card()
-                selected_card = self.my_cards[card_index]
+                selected_card = self.interface.wait_for_card()
                 card_ok = self.can_play_card(selected_card)
                 if not card_ok:
                     self.interface.update_score_info('Cannot play this card, too high.')
-            self.btn_player_hand.destroy_cards(card_index, False)
+            # self.btn_player_hand.destroy_cards(card_index, False)
+            [cb.hide() for cb in self.game.table.player_card_buttons if cb.card == selected_card]
         else:
             available_cards = [c for c in self.my_cards if c not in self.played_cards]
             for card in available_cards:
@@ -525,7 +595,6 @@ class Round():
         return added_points
 
     def pairs_in_pegging(self):
-        points_for_pairs = 0
         if len(self.played_cards) > 1:
             if self.played_cards[-1].rank == self.played_cards[-2].rank:
                 self.of_a_kind_count += 1
