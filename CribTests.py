@@ -208,7 +208,7 @@ class CribTest(unittest.TestCase):
         player = [Crib.Card(2, CLUBS), Crib.Card(2, DIAMONDS), 
                 Crib.Card(10, HEARTS), Crib.Card(5, SPADES), Crib.Card(5, CLUBS)]
         comp = [Crib.Card(12, CLUBS), Crib.Card(2, SPADES), 
-                Crib.Card(2, HEARTS), Crib.Card(13, SPADES), Crib.Card(11, CLUBS)]
+                Crib.Card(2, HEARTS), Crib.Card(7, SPADES), Crib.Card(11, CLUBS)]
         crib_round = Crib.Round(game=None, cards=player, comp_cards=comp)
         crib_round.interface.update_score_info('=== testDozenInPairsPegging ===')
         crib_round.play_round()

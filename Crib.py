@@ -21,15 +21,13 @@ VERSION = '2.1.2'
 
 
 def make_spacer(owner_frame, text_string, column, min_size):
-    my_label = tkinter.Label(owner_frame, text=text_string, fg='green',
-                             bg='green')
+    my_label = tkinter.Label(owner_frame, text=text_string, fg='green', bg='green')
     my_label.grid(row=0, column=column, sticky='w')
     if min_size > 0:
         owner_frame.grid_columnconfigure(column, minsize=min_size)
 
 
 class Table:
-
     def __init__(self):
         self.gui = tkinter.Tk()
         self.gui.title('Crib!          v' + VERSION)
@@ -106,10 +104,6 @@ class Table:
             game = Game(self)
             game.play()
 
-    def display_card(self, widget, card):
-        ''' show a card, making it the right colour, depending on its suit '''
-        widget.configure(text=str(card), fg=self.colour_dict[card.suit])
-
     def await_control_button_click(self, instruction):
         self.card_var.set(-1)
         while self.card_var.get() != 19:
@@ -153,6 +147,10 @@ class CardButton:
         self.button.configure(text='')
         self.button.grid_forget()
 
+    def clear(self):
+        self.card = None
+        self.hide()
+
 
 class Game:
     def __init__(self, table):
@@ -171,12 +169,12 @@ class Game:
             self.is_players_turn = not self.player_has_box
             self.table.await_control_button_click('Deal for new round')
             if this_round != None:
-                this_round.interface.clear_cards_in_list(this_round.box)
+                this_round.interface.clear_box()
                 del (this_round)
             this_round = Round(self)
             this_round.play_round()
             self.player_has_box = not self.player_has_box
-        this_round.interface.clear_cards_in_list(this_round.box)
+        this_round.interface.clear_box()
         del (this_round)
 
 
@@ -196,7 +194,7 @@ class RoundInterface():
     def wait_for_ctrl_btn_click(self, blah):
         pass
 
-    def wait_for_card(self):
+    def wait_for_card(self, cards=None):
         pass
 
     def allocate_cards_after_deal(self, player_cards, computer_cards):
@@ -205,11 +203,27 @@ class RoundInterface():
     def transfer_to_box(self, card, round):
         pass
 
+    def turn_up_top_card(self, top_card):
+        pass
+
+    def hide_played_card(self, card):
+        pass
+
     def show_cards_in_list(self, card_list):
         pass
 
-    def clear_cards_in_list(self, card_list, pc_only=False):
+    def clear_buttons_in(self, card_button_list):
         pass
+
+    def clear_box(self):
+        pass
+
+    def hand_display(self, hand, players_hand, is_box=False):
+        owner_dict = {True: 'my', False: 'computer\'s'}
+        box_or_hand_dict = {True: 'box', False: 'hand'}
+        owner = owner_dict[players_hand]
+        hand_or_box = box_or_hand_dict[is_box]
+        self.wait_for_ctrl_btn_click('Show ' + owner + ' ' + hand_or_box)
 
 
 class RoundTestInterface(RoundInterface):
@@ -221,12 +235,18 @@ class RoundTestInterface(RoundInterface):
         if len(info_to_display) > 0:
             self.log_file.writelines(info_to_display + '\n')
 
-    def wait_for_card(self):
-        return -1
+    def wait_for_card(self, player_cards=None):
+        return player_cards[-1]
+
+    def turn_up_top_card(self, top_card):
+        self.update_score_info('Card turned up: ' + str(top_card))
 
     def show_cards_in_list(self, card_list):
         # cast card_list to a string
         pass
+
+    def hand_display(self, hand, is_player, is_box=False):
+        return str([str(c) for c in hand])
 
 
 class RoundVisualInterface(RoundInterface):
@@ -265,7 +285,7 @@ class RoundVisualInterface(RoundInterface):
     def wait_for_ctrl_btn_click(self, button_text):
         self.table.await_control_button_click(button_text)
 
-    def wait_for_card(self):
+    def wait_for_card(self, player_cards=None):
         self.table.card_var.set(-1)
         while self.table.card_var.get() < 0 or self.table.card_var.get() > 4:
             self.table.btControl.wait_variable(self.table.card_var)
@@ -293,17 +313,30 @@ class RoundVisualInterface(RoundInterface):
         origin_cb.hide()
         origin_cb.card = None
 
+    def turn_up_top_card(self, top_card):
+        self.table.face_up_card_buttons[0].card = top_card
+        self.table.face_up_card_buttons[0].show(face_up=True)
+
+    def hide_played_card(self, card):
+        [cb.hide() for cb in self.all_card_buttons if cb.card == card]
+
+    def hand_display(self, hand, is_player, is_box=False):
+        super(RoundVisualInterface, self).hand_display(hand, is_player, is_box)
+        self.show_cards_in_list(hand)
+        if is_box:
+            self.clear_buttons_in(self.table.player_card_buttons + self.table.comp_card_buttons)
+        else:
+            self.clear_buttons_in(self.table.played_cards_buttons)
+        return ''
+
     def show_cards_in_list(self, card_list):
         [cb.show(face_up=True) for cb in self.all_card_buttons if cb.card in card_list]
 
-    def clear_cards_in_list(self, card_list, played_cards_only=False):
-        buttons_to_consider = self.all_card_buttons
-        if played_cards_only:
-            buttons_to_consider = self.table.played_cards_buttons
-        for cb in buttons_to_consider:
-            if cb.card in card_list:
-                cb.card = None
-                cb.hide()
+    def clear_buttons_in(self, card_button_list):
+        [cb.clear() for cb in card_button_list]
+
+    def clear_box(self):
+        self.clear_buttons_in(self.table.player_box_buttons + self.table.comp_box_buttons)
 
 
 class Round:
@@ -364,7 +397,7 @@ class Round:
                 box_string = ''
                 while len(self.box) < initial_box_size + 2:
                     self.interface.update_ctrl_btn_text('Click on two cards to add them to the box')
-                    card_for_box = self.interface.wait_for_card()
+                    card_for_box = self.interface.wait_for_card(self.my_cards)
                     self.box.append(card_for_box)
                     # find and remove the card from player's hand
                     ind = self.my_cards.index(card_for_box)
@@ -391,11 +424,7 @@ class Round:
     def turn_up_top_card(self):
         # Turn up the next card, Two for his heels check:
         self.face_up_card = self.the_pack.deal(1)[0]
-        if self.game is not None:
-            self.game.table.face_up_card_buttons[0].card = self.face_up_card
-            self.game.table.face_up_card_buttons[0].show(face_up=True)
-        else:
-            self.interface.update_score_info('Card turned up: ' + str(self.face_up_card))
+        self.interface.turn_up_top_card(self.face_up_card)
         if self.face_up_card.rank == 11:
             heels_notification = 'Two for his heels!'
             updated_score = self.interface.update_pegs(self.player_has_box, 2)
@@ -455,21 +484,20 @@ class Round:
                 card_ok = self.can_play_card(selected_card)
                 if not card_ok:
                     self.interface.update_score_info('Cannot play this card, too high.')
-            [cb.hide() for cb in self.game.table.player_card_buttons if cb.card == selected_card]
         else:
             available_cards = [c for c in self.my_cards if c not in self.played_cards]
             for card in available_cards:
                 if self.can_play_card(card):
                     selected_card = card
                     break
+        self.interface.hide_played_card(selected_card)
         return selected_card
 
     def computer_picks_card(self):
         self.interface.wait_for_ctrl_btn_click('Computer\'s turn')
-        if self.game is not None:
-            selected_card = self.computer.card_to_play()
-            [cb.hide() for cb in self.game.table.comp_card_buttons if cb.card == selected_card]
-        return self.computer.card_to_play()
+        selected_card = self.computer.card_to_play()
+        self.interface.hide_played_card(selected_card)
+        return selected_card
 
     def play_card(self, card_played):
         ''' see if this card gets any points and show new scores when a valid card is played'''
@@ -566,34 +594,14 @@ class Round:
         self.last_score_comment = ''
 
     def hand_display(self, is_player, is_box=False):
-        if is_player:
-            card_list = self.my_cards
-            owner = 'my'
-        else:
-            card_list = self.comp_cards
-            owner = 'computer\'s'
-
+        hand_dict = {True: self.my_cards, False: self.comp_cards}
+        hand_to_score = hand_dict[is_player]
         if is_box:
-            hand_or_box = ' box'
-            card_list = self.box
-        else:
-            hand_or_box = ' hand'
+            hand_to_score = self.box
 
-        self.interface.wait_for_ctrl_btn_click('Show ' + owner + hand_or_box)
-        int_score, text_score = score_hand(card_list + [self.face_up_card])
+        int_score, text_score = score_hand(hand_to_score + [self.face_up_card])
         str_info = text_score + ' is ' + str(int_score)
-        if self.game is None:
-            str_info = str([str(c) for c in card_list]) + str_info
-
-        if self.game is not None:
-            # clear the played cards (and if appropriate, hands), before displaying the cards:
-            # TODO: looks like we need a general 'destroy all cards in a list' interface method
-            # . . . and probably a 'show all' too, and also the search for a specific card
-            if is_box:
-                self.interface.clear_cards_in_list(self.my_cards + self.comp_cards)
-            else:
-                self.interface.clear_cards_in_list(self.played_cards, played_cards_only=True)
-            self.interface.show_cards_in_list(card_list)
+        str_info = self.interface.hand_display(hand_to_score, is_player, is_box) + str_info
 
         new_score = self.interface.update_pegs(is_player, int_score)
         str_info += self.check_for_win(is_player, new_score)
