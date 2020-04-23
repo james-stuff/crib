@@ -17,7 +17,7 @@ WIN_SCORE = 121
 NUMBERS = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven',
            'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen',
            'fourteen', 'fifteen', 'sixteen']
-VERSION = '2.1.2'
+VERSION = '2.1.3'
 
 
 def make_spacer(owner_frame, text_string, column, min_size):
@@ -206,6 +206,9 @@ class RoundInterface():
     def turn_up_top_card(self, top_card):
         pass
 
+    def player_picks_card(self, round):
+        pass
+
     def hide_played_card(self, card):
         pass
 
@@ -219,12 +222,7 @@ class RoundInterface():
         pass
 
     def hand_display(self, hand, players_hand, is_box=False):
-        owner_dict = {True: 'my', False: 'computer\'s'}
-        box_or_hand_dict = {True: 'box', False: 'hand'}
-        owner = owner_dict[players_hand]
-        hand_or_box = box_or_hand_dict[is_box]
-        self.wait_for_ctrl_btn_click('Show ' + owner + ' ' + hand_or_box)
-
+        pass
 
 class RoundTestInterface(RoundInterface):
     def __init__(self):
@@ -241,9 +239,8 @@ class RoundTestInterface(RoundInterface):
     def turn_up_top_card(self, top_card):
         self.update_score_info('Card turned up: ' + str(top_card))
 
-    def show_cards_in_list(self, card_list):
-        # cast card_list to a string
-        pass
+    def player_picks_card(self, round):
+        return round.player_picks_card_in_test_mode()
 
     def hand_display(self, hand, is_player, is_box=False):
         return str([str(c) for c in hand])
@@ -317,11 +314,26 @@ class RoundVisualInterface(RoundInterface):
         self.table.face_up_card_buttons[0].card = top_card
         self.table.face_up_card_buttons[0].show(face_up=True)
 
+    def player_picks_card(self, round):
+        self.update_ctrl_btn_text('It\'s your turn!  Click a card to play it')
+        card_ok = False
+        while not card_ok:
+            selected_card = self.wait_for_card()
+            card_ok = round.can_play_card(selected_card)
+            if not card_ok:
+                self.update_score_info('Cannot play this card, too high.')
+        self.hide_played_card(selected_card)
+        return selected_card
+
     def hide_played_card(self, card):
         [cb.hide() for cb in self.all_card_buttons if cb.card == card]
 
     def hand_display(self, hand, is_player, is_box=False):
-        super(RoundVisualInterface, self).hand_display(hand, is_player, is_box)
+        owner_dict = {True: 'my', False: 'computer\'s'}
+        box_or_hand_dict = {True: 'box', False: 'hand'}
+        owner = owner_dict[is_player]
+        hand_or_box = box_or_hand_dict[is_box]
+        self.wait_for_ctrl_btn_click('Show ' + owner + ' ' + hand_or_box)
         self.show_cards_in_list(hand)
         if is_box:
             self.clear_buttons_in(self.table.player_card_buttons + self.table.comp_card_buttons)
@@ -435,7 +447,7 @@ class Round:
         while len(self.played_cards) < 6:
             self.check_if_knock_required()
             if self.is_players_turn and not self.player_knock:
-                card_to_play = self.player_picks_card()
+                card_to_play = self.interface.player_picks_card(self)
             elif not self.is_players_turn and not self.comp_knock:
                 card_to_play = self.computer_picks_card()
             else:
@@ -475,22 +487,12 @@ class Round:
     def can_play_card(self, card):
         return self.running_total + card.value <= 31
 
-    def player_picks_card(self):
-        self.interface.update_ctrl_btn_text('It\'s your turn!  Click a card to play it')
-        if self.game is not None:
-            card_ok = False
-            while not card_ok:
-                selected_card = self.interface.wait_for_card()
-                card_ok = self.can_play_card(selected_card)
-                if not card_ok:
-                    self.interface.update_score_info('Cannot play this card, too high.')
-        else:
-            available_cards = [c for c in self.my_cards if c not in self.played_cards]
-            for card in available_cards:
-                if self.can_play_card(card):
-                    selected_card = card
-                    break
-        self.interface.hide_played_card(selected_card)
+    def player_picks_card_in_test_mode(self):
+        available_cards = [c for c in self.my_cards if c not in self.played_cards]
+        for card in available_cards:
+            if self.can_play_card(card):
+                selected_card = card
+                break
         return selected_card
 
     def computer_picks_card(self):
