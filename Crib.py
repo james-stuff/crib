@@ -36,7 +36,7 @@ class Table:
 
         # list of the four frames used for showing cards, then lists of their properties that line up:
         self.frame_list = []
-        frame_widths = [600, 600, 500, 300]
+        frame_widths = [900, 600, 500, 300]
         frame_rows = [0, 0, 2, 2]
         frame_cols = [0, 1, 0, 2]
 
@@ -44,37 +44,37 @@ class Table:
             self.frame_list.append(tkinter.Frame(self.gui, width=frame_widths[frm],
                                                  height=150, bg='green'))
             self.frame_list[-1].grid(row=frame_rows[frm],
-                                     column=frame_cols[frm], sticky='w')
+                                     column=frame_cols[frm], sticky='w', padx=20)
+            # self.frame_list[-1].grid_propagate(False)
 
         info_frame = tkinter.Frame(self.gui, bg='green')
         info_frame.grid(row=1, columnspan=3, sticky='we')
 
         button_frame = tkinter.Frame(self.gui, bg='green', width=220, height=200)
         button_frame.grid(row=2, column=1, sticky='we')
-        self.frame_list[2].grid_propagate(False)
+        # self.frame_list[2].grid_propagate(False)
         button_frame.grid_propagate(False)
-        self.frame_list[3].grid_propagate(False)
+        # self.frame_list[3].grid_propagate(False)
 
-        l_pack_cards = []
         for n in range(4):
-            l_pack_cards.append(tkinter.Label(self.frame_list[0],
-                                              font=('Arial Bold', 2),
-                                              borderwidth=1,
-                                              height=29, width=1,
-                                              relief='raised'))
-            l_pack_cards[-1].grid(column=1 + n, row=0, sticky='w')
+            card_in_pack = tkinter.Label(self.frame_list[0], borderwidth=1,
+                                         height=174, width=10, relief='raised',
+                                         image=tkinter.PhotoImage(file='Images\\blank.png'))
+            card_in_pack.grid(column=1 + n, row=0, sticky='w')
 
         make_spacer(self.frame_list[0], '-', 0, 0)
         make_spacer(self.frame_list[0], 20 * '-', 6, 20)
         make_spacer(self.frame_list[1], '-', 19, 200)
 
         self.btControl = tkinter.Button(button_frame, text='Start new game',
-                                        command=self.new_game)
-        self.btControl.grid(padx=10, pady=50)
+                                        command=self.new_game, font=('Arial Bold', 12),
+                                        wraplength=100)
+        # self.btControl.grid(padx=10, pady=50)
+        self.btControl.place(x=10, y=50)
 
-        self.btQuit = tkinter.Button(button_frame, text='Quit',
-                                     command=lambda: self.card_var.set(20))
-        self.btQuit.grid(row=1, column=0)
+        # self.btQuit = tkinter.Button(button_frame, text='Quit',
+        #                              command=lambda: self.card_var.set(20))
+        # self.btQuit.grid(row=1, column=0)
 
         self.score_info = tkinter.StringVar()
         self.l_score = tkinter.Label(info_frame, font=('Helvetica', 12),
@@ -109,42 +109,45 @@ class Table:
         while self.card_var.get() != 19:
             self.btControl.configure(text=instruction)
             self.btControl.wait_variable(self.card_var)
-            if self.card_var.get() == 20:
-                self.gui.destroy()
-                break
+            # if self.card_var.get() == 20:
+            #     self.gui.destroy()
+            #     break
 
 
 class CardButton:
-    colour_dict = {CLUBS: 'black', SPADES: 'black', HEARTS: 'red',
-                   DIAMONDS: 'red'}
+    colour_dict = {CLUBS: 'black', SPADES: 'black', HEARTS: 'red', DIAMONDS: 'red'}
 
     def __init__(self, table, frame, index, col_start):
         self.table = table
         self.card = None
-        self.button = tkinter.Button(frame, font=('Arial Bold', 20), height=3, width=3)
+        self.button = tkinter.Button(frame, width=126, height=174)
         self.clickable_button_id = index
         self.disp_column = col_start + index
+        self.image = None
+        self.face_down_image = tkinter.PhotoImage(file='Images\\blank.png')
 
     def make_clickable(self):
         self.button.configure(command=lambda: self.table.card_var.set(self.clickable_button_id))
 
     def show(self, face_up=False):
-        card_text = ''
         if face_up:
-            card_text = str(self.card)
-            self.button.configure(fg=self.colour_dict[self.card.suit])
-        self.button.configure(text=card_text)
+            suits_dict = {CLUBS: 'clubs', DIAMONDS: 'diamonds', SPADES: 'spades', HEARTS: 'hearts'}
+            im_file = 'Images\\' + str(self.card)[:-1] + suits_dict[str(self.card)[-1]] + '.png'
+            self.image = tkinter.PhotoImage(file=im_file)
+        else:
+            self.image = self.face_down_image
+        self.button.configure(image=self.image, border=0)
         self.button.grid(row=0, column=self.disp_column, pady=10)
 
     def show_reduced(self):
-        self.button.configure(font=('Arial Bold', 12), height=5, width=2, anchor='nw')
+        self.button.configure(width=18, anchor='nw')
 
     def show_full_size(self):
         self.show(face_up=True)
-        self.button.configure(font=('Arial Bold', 20), height=3, width=3, anchor='center')
+        self.button.configure(width=126, anchor='center')
 
     def hide(self):
-        self.button.configure(text='')
+        self.button.configure(image=None, text='')
         self.button.grid_forget()
 
     def clear(self):
@@ -388,7 +391,7 @@ class Round:
 
         if self.game is not None and self.game.win_detected:
             self.interface.wait_for_ctrl_btn_click('Start new game')
-            self.interface.show_cards_in_list([self.face_up_card], face_up=False)
+            self.interface.show_cards_in_list([self.face_up_card])
         if self.game is None:
             self.interface.log_file.close()
 
