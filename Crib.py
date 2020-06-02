@@ -34,43 +34,33 @@ class Table:
         self.gui.geometry('1250x500')
         self.gui.configure(bg='green')
 
-        # list of the four frames used for showing cards, then lists of their properties that line up:
+        # list of the four frames used for showing cards
         self.frame_list = []
-        frame_widths = [900, 600, 500, 300]
-        frame_rows = [0, 0, 2, 2]
-        frame_cols = [0, 1, 0, 2]
-
         for frm in range(4):
-            self.frame_list.append(tkinter.Frame(self.gui, width=frame_widths[frm],
-                                                 height=150, bg='green'))
-            self.frame_list[-1].grid(row=frame_rows[frm],
-                                     column=frame_cols[frm], sticky='w', padx=20)
-            # self.frame_list[-1].grid_propagate(False)
+            self.frame_list.append(tkinter.Frame(self.gui, height=150, bg='green'))
+            self.frame_list[-1].grid(row=(frm // 2) * 2, column=frm % 2, sticky='w')
 
         info_frame = tkinter.Frame(self.gui, bg='green')
         info_frame.grid(row=1, columnspan=3, sticky='we')
 
-        button_frame = tkinter.Frame(self.gui, bg='green', width=220, height=200)
-        button_frame.grid(row=2, column=1, sticky='we')
-        # self.frame_list[2].grid_propagate(False)
-        button_frame.grid_propagate(False)
-        # self.frame_list[3].grid_propagate(False)
-
         for n in range(4):
-            card_in_pack = tkinter.Label(self.frame_list[0], borderwidth=1,
-                                         height=174, width=10, relief='raised',
-                                         image=tkinter.PhotoImage(file='Images\\blank.png'))
+            card_in_pack = tkinter.Button(self.frame_list[0], borderwidth=1,
+                                          height=174, width=10, relief='raised',
+                                          image=tkinter.PhotoImage(file='Images\\blank.png'))
             card_in_pack.grid(column=1 + n, row=0, sticky='w')
 
         make_spacer(self.frame_list[0], '-', 0, 0)
         make_spacer(self.frame_list[0], 20 * '-', 6, 20)
-        make_spacer(self.frame_list[1], '-', 19, 200)
+        make_spacer(self.frame_list[1], '-', 0, 20)
+        make_spacer(self.frame_list[1], '-', 19, 50)
 
-        self.btControl = tkinter.Button(button_frame, text='Start new game',
+        self.btControl = tkinter.Button(self.frame_list[2], text='Start new game',
                                         command=self.new_game, font=('Arial Bold', 12),
                                         wraplength=100)
         # self.btControl.grid(padx=10, pady=50)
-        self.btControl.place(x=10, y=50)
+        # self.btControl.place(x=100, y=100)
+        self.btControl.grid(row=0, pady=20, padx=82)
+        self.frame_list[2].columnconfigure(0, minsize=282)
 
         # self.btQuit = tkinter.Button(button_frame, text='Quit',
         #                              command=lambda: self.card_var.set(20))
@@ -82,7 +72,7 @@ class Table:
         self.peg_board = PegBoard(tkinter.Label(info_frame),
                                   tkinter.Label(info_frame))
 
-        make_spacer(self.frame_list[2], 39 * '-', 0, 0)
+        # make_spacer(self.frame_list[2], 52 * '-', 0, 0)
 
         # NEW 20/04: create player card buttons:
         self.player_card_buttons = [CardButton(self, self.frame_list[2], n, 2) for n in range(5)]
@@ -90,7 +80,7 @@ class Table:
         self.face_up_card_buttons[0].show()
         self.played_cards_buttons = [CardButton(self, self.frame_list[1], n, 12) for n in range(6)]
         self.comp_card_buttons = [CardButton(self, self.frame_list[0], n, 7) for n in range(5)]
-        self.player_box_buttons = [CardButton(self, self.frame_list[3], n, 21) for n in range(4)]
+        self.player_box_buttons = [CardButton(self, self.frame_list[3], n, 0) for n in range(4)]
         self.comp_box_buttons = [CardButton(self, self.frame_list[1], n, 21) for n in range(4)]
         self.all_cb = self.player_card_buttons + self.face_up_card_buttons + \
                       self.played_cards_buttons + self.comp_card_buttons + \
@@ -120,7 +110,8 @@ class CardButton:
     def __init__(self, table, frame, index, col_start):
         self.table = table
         self.card = None
-        self.button = tkinter.Button(frame, width=126, height=174)
+        self.full_width = 110
+        self.button = tkinter.Button(frame, width=self.full_width, height=174)
         self.clickable_button_id = index
         self.disp_column = col_start + index
         self.image = None
@@ -144,7 +135,7 @@ class CardButton:
 
     def show_full_size(self):
         self.show(face_up=True)
-        self.button.configure(width=126, anchor='center')
+        self.button.configure(width=self.full_width, anchor='center')
 
     def hide(self):
         self.button.configure(image=None, text='')
