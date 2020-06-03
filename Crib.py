@@ -20,68 +20,57 @@ NUMBERS = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven',
 VERSION = '2.1.3'
 
 
-def make_spacer(owner_frame, text_string, column, min_size):
-    my_label = tkinter.Label(owner_frame, text=text_string, fg='green', bg='green')
-    my_label.grid(row=0, column=column, sticky='w')
-    if min_size > 0:
-        owner_frame.grid_columnconfigure(column, minsize=min_size)
-
-
 class Table:
     def __init__(self):
         self.gui = tkinter.Tk()
         self.gui.title('Crib!          v' + VERSION)
-        self.gui.geometry('1250x500')
+        self.gui.geometry('1270x500')
         self.gui.configure(bg='green')
 
-        # list of the four frames used for showing cards
-        self.frame_list = []
-        for frm in range(4):
-            self.frame_list.append(tkinter.Frame(self.gui, height=150, bg='green'))
-            self.frame_list[-1].grid(row=(frm // 2) * 2, column=frm % 2, sticky='w')
+        self.upper_card_frame = tkinter.Frame(self.gui, bg='green', width=400, height=194)
+        self.comp_cards_frame = tkinter.Frame(self.gui, bg='green', width=870, height=194)
+        self.lower_card_frame = tkinter.Frame(self.gui, bg='green')
+        self.player_cards_frame = tkinter.Frame(self.gui, bg='green')
+        for ind, fr in enumerate([self.upper_card_frame, self.comp_cards_frame,
+                                  self.lower_card_frame, self.player_cards_frame]):
+            fr.grid(row=(ind // 2) * 2, column=(ind % 2), sticky='w', padx=10)
+
+        for n in range(4):
+            card_in_pack = tkinter.Button(self.upper_card_frame, borderwidth=1,
+                                          height=174, width=4, relief='raised',
+                                          image=tkinter.PhotoImage(file='Images\\blank.png'))
+            card_in_pack.grid(column=n, row=0, sticky='w')
+
+        self.upper_card_frame.columnconfigure(5, minsize=50)
+        self.upper_card_frame.columnconfigure(12, minsize=10)
+        self.comp_cards_frame.columnconfigure(19, minsize=50)
+        # played_cards_spacer = tkinter.Label(self.upper_card_frame, font=('Arial', 1), width=200, height=0)
+        # played_cards_spacer.grid(row=1, column=6, columnspan=6)
+        self.upper_card_frame.grid_propagate(False)
+        self.comp_cards_frame.grid_propagate(False)
+
+        self.btControl = tkinter.Button(self.lower_card_frame, text='Start new game',
+                                        command=self.new_game, font=('Arial Bold', 12),
+                                        wraplength=100)
+        self.btControl.grid(row=0, pady=40)
+        self.lower_card_frame.rowconfigure(0, minsize=150)
+        self.lower_card_frame.columnconfigure(0, minsize=188)
+        self.player_cards_frame.columnconfigure(6, minsize=50)
 
         info_frame = tkinter.Frame(self.gui, bg='green')
         info_frame.grid(row=1, columnspan=3, sticky='we')
-
-        for n in range(4):
-            card_in_pack = tkinter.Button(self.frame_list[0], borderwidth=1,
-                                          height=174, width=10, relief='raised',
-                                          image=tkinter.PhotoImage(file='Images\\blank.png'))
-            card_in_pack.grid(column=1 + n, row=0, sticky='w')
-
-        make_spacer(self.frame_list[0], '-', 0, 0)
-        make_spacer(self.frame_list[0], 20 * '-', 6, 20)
-        make_spacer(self.frame_list[1], '-', 0, 20)
-        make_spacer(self.frame_list[1], '-', 19, 50)
-
-        self.btControl = tkinter.Button(self.frame_list[2], text='Start new game',
-                                        command=self.new_game, font=('Arial Bold', 12),
-                                        wraplength=100)
-        # self.btControl.grid(padx=10, pady=50)
-        # self.btControl.place(x=100, y=100)
-        self.btControl.grid(row=0, pady=20, padx=82)
-        self.frame_list[2].columnconfigure(0, minsize=282)
-
-        # self.btQuit = tkinter.Button(button_frame, text='Quit',
-        #                              command=lambda: self.card_var.set(20))
-        # self.btQuit.grid(row=1, column=0)
-
         self.score_info = tkinter.StringVar()
         self.l_score = tkinter.Label(info_frame, font=('Helvetica', 12),
                                      textvariable=self.score_info)
-        self.peg_board = PegBoard(tkinter.Label(info_frame),
-                                  tkinter.Label(info_frame))
+        self.peg_board = PegBoard(tkinter.Label(info_frame), tkinter.Label(info_frame))
 
-        # make_spacer(self.frame_list[2], 52 * '-', 0, 0)
-
-        # NEW 20/04: create player card buttons:
-        self.player_card_buttons = [CardButton(self, self.frame_list[2], n, 2) for n in range(5)]
-        self.face_up_card_buttons = [CardButton(self, self.frame_list[0], 0, 5)]
+        self.player_card_buttons = [CardButton(self, self.player_cards_frame, n, 1) for n in range(5)]
+        self.face_up_card_buttons = [CardButton(self, self.upper_card_frame, 0, 4)]
         self.face_up_card_buttons[0].show()
-        self.played_cards_buttons = [CardButton(self, self.frame_list[1], n, 12) for n in range(6)]
-        self.comp_card_buttons = [CardButton(self, self.frame_list[0], n, 7) for n in range(5)]
-        self.player_box_buttons = [CardButton(self, self.frame_list[3], n, 0) for n in range(4)]
-        self.comp_box_buttons = [CardButton(self, self.frame_list[1], n, 21) for n in range(4)]
+        self.played_cards_buttons = [CardButton(self, self.upper_card_frame, n, 6) for n in range(6)]
+        self.comp_card_buttons = [CardButton(self, self.comp_cards_frame, n, 13) for n in range(5)]
+        self.player_box_buttons = [CardButton(self, self.player_cards_frame, n, 7) for n in range(4)]
+        self.comp_box_buttons = [CardButton(self, self.comp_cards_frame, n, 21) for n in range(4)]
         self.all_cb = self.player_card_buttons + self.face_up_card_buttons + \
                       self.played_cards_buttons + self.comp_card_buttons + \
                       self.player_box_buttons + self.comp_box_buttons
@@ -131,7 +120,7 @@ class CardButton:
         self.button.grid(row=0, column=self.disp_column, pady=10)
 
     def show_reduced(self):
-        self.button.configure(width=18, anchor='nw')
+        self.button.configure(width=16, anchor='w')
 
     def show_full_size(self):
         self.show(face_up=True)
