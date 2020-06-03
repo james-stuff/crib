@@ -24,37 +24,35 @@ class Table:
     def __init__(self):
         self.gui = tkinter.Tk()
         self.gui.title('Crib!          v' + VERSION)
-        self.gui.geometry('1270x500')
+        self.gui.geometry('1270x475')
         self.gui.configure(bg='green')
 
-        self.upper_card_frame = tkinter.Frame(self.gui, bg='green', width=400, height=194)
+        self.common_card_frame = tkinter.Frame(self.gui, bg='green', width=405, height=194)
         self.comp_cards_frame = tkinter.Frame(self.gui, bg='green', width=870, height=194)
-        self.lower_card_frame = tkinter.Frame(self.gui, bg='green')
+        self.button_frame = tkinter.Frame(self.gui, bg='green')
         self.player_cards_frame = tkinter.Frame(self.gui, bg='green')
-        for ind, fr in enumerate([self.upper_card_frame, self.comp_cards_frame,
-                                  self.lower_card_frame, self.player_cards_frame]):
-            fr.grid(row=(ind // 2) * 2, column=(ind % 2), sticky='w', padx=10)
+        for ind, fr in enumerate([self.common_card_frame, self.comp_cards_frame,
+                                  self.button_frame, self.player_cards_frame]):
+            fr.grid(row=(ind // 2) * 2, column=(ind % 2), sticky='w', padx=((ind % 2) + 1) * 10)
 
         for n in range(4):
-            card_in_pack = tkinter.Button(self.upper_card_frame, borderwidth=1,
+            card_in_pack = tkinter.Button(self.common_card_frame, borderwidth=1,
                                           height=174, width=4, relief='raised',
                                           image=tkinter.PhotoImage(file='Images\\blank.png'))
             card_in_pack.grid(column=n, row=0, sticky='w')
 
-        self.upper_card_frame.columnconfigure(5, minsize=50)
-        self.upper_card_frame.columnconfigure(12, minsize=10)
+        self.common_card_frame.columnconfigure(5, minsize=50)
+        self.common_card_frame.columnconfigure(12, minsize=10)
         self.comp_cards_frame.columnconfigure(19, minsize=50)
-        # played_cards_spacer = tkinter.Label(self.upper_card_frame, font=('Arial', 1), width=200, height=0)
-        # played_cards_spacer.grid(row=1, column=6, columnspan=6)
-        self.upper_card_frame.grid_propagate(False)
+        self.common_card_frame.grid_propagate(False)
         self.comp_cards_frame.grid_propagate(False)
 
-        self.btControl = tkinter.Button(self.lower_card_frame, text='Start new game',
+        self.btControl = tkinter.Button(self.button_frame, text='Start new game',
                                         command=self.new_game, font=('Arial Bold', 12),
-                                        wraplength=100)
-        self.btControl.grid(row=0, pady=40)
-        self.lower_card_frame.rowconfigure(0, minsize=150)
-        self.lower_card_frame.columnconfigure(0, minsize=188)
+                                        wraplength=100, height=4, width=12)
+        self.btControl.grid(row=0, pady=40, sticky='e')
+        self.button_frame.rowconfigure(0, minsize=174)
+        self.button_frame.columnconfigure(0, minsize=360)
         self.player_cards_frame.columnconfigure(6, minsize=50)
 
         info_frame = tkinter.Frame(self.gui, bg='green')
@@ -65,9 +63,9 @@ class Table:
         self.peg_board = PegBoard(tkinter.Label(info_frame), tkinter.Label(info_frame))
 
         self.player_card_buttons = [CardButton(self, self.player_cards_frame, n, 1) for n in range(5)]
-        self.face_up_card_buttons = [CardButton(self, self.upper_card_frame, 0, 4)]
+        self.face_up_card_buttons = [CardButton(self, self.common_card_frame, 0, 4)]
         self.face_up_card_buttons[0].show()
-        self.played_cards_buttons = [CardButton(self, self.upper_card_frame, n, 6) for n in range(6)]
+        self.played_cards_buttons = [CardButton(self, self.common_card_frame, n, 6) for n in range(6)]
         self.comp_card_buttons = [CardButton(self, self.comp_cards_frame, n, 13) for n in range(5)]
         self.player_box_buttons = [CardButton(self, self.player_cards_frame, n, 7) for n in range(4)]
         self.comp_box_buttons = [CardButton(self, self.comp_cards_frame, n, 21) for n in range(4)]
@@ -110,20 +108,22 @@ class CardButton:
         self.button.configure(command=lambda: self.table.card_var.set(self.clickable_button_id))
 
     def show(self, face_up=False):
+        show_border = False
         if face_up:
             suits_dict = {CLUBS: 'clubs', DIAMONDS: 'diamonds', SPADES: 'spades', HEARTS: 'hearts'}
             im_file = 'Images\\' + str(self.card)[:-1] + suits_dict[str(self.card)[-1]] + '.png'
             self.image = tkinter.PhotoImage(file=im_file)
         else:
             self.image = self.face_down_image
-        self.button.configure(image=self.image, border=0)
+            show_border = True
+        self.button.configure(image=self.image, border=show_border)
         self.button.grid(row=0, column=self.disp_column, pady=10)
 
-    def show_reduced(self):
+    def reduce_width(self):
         self.button.configure(width=16, anchor='w')
 
-    def show_full_size(self):
-        self.show(face_up=True)
+    def show_full_size(self, face_up=True):
+        self.show(face_up=face_up)
         self.button.configure(width=self.full_width, anchor='center')
 
     def hide(self):
@@ -195,7 +195,7 @@ class RoundInterface():
     def hide_played_card(self, card):
         pass
 
-    def show_cards_in_list(self, card_list):
+    def show_cards_in_list(self, card_list, visible=True):
         pass
 
     def clear_buttons_in(self, card_button_list):
@@ -206,6 +206,7 @@ class RoundInterface():
 
     def hand_display(self, hand, players_hand, is_box=False):
         pass
+
 
 class RoundTestInterface(RoundInterface):
     def __init__(self):
@@ -248,7 +249,7 @@ class RoundVisualInterface(RoundInterface):
                 # this means 31 or double-knock, so clear previously-played cards here:
                 [cb.show(face_up=False) for cb in self.table.played_cards_buttons[:no_of_cards_down]]
                 self.turn_over_played_cards_on_next_turn = False
-            self.table.played_cards_buttons[no_of_cards_down - 2].show_reduced()
+            self.table.played_cards_buttons[no_of_cards_down - 2].reduce_width()
         self.table.played_cards_buttons[no_of_cards_down - 1].card = played_cards[-1]
         self.table.played_cards_buttons[no_of_cards_down - 1].show_full_size()
 
@@ -289,6 +290,8 @@ class RoundVisualInterface(RoundInterface):
         destination_box = {True: self.table.player_box_buttons, False: self.table.comp_box_buttons}
         destination_box[round.player_has_box][cards_in_box - 1].card = card
         destination_box[round.player_has_box][cards_in_box - 1].show(face_up=False)
+        if cards_in_box > 1:
+            destination_box[round.player_has_box][cards_in_box - 2].reduce_width()
         origin_cb = [cb for cb in origin_hand[round.is_players_turn] if cb.card == card][0]
         origin_cb.hide()
         origin_cb.card = None
@@ -324,8 +327,8 @@ class RoundVisualInterface(RoundInterface):
             self.clear_buttons_in(self.table.played_cards_buttons)
         return ''
 
-    def show_cards_in_list(self, card_list):
-        [cb.show(face_up=True) for cb in self.all_card_buttons if cb.card in card_list]
+    def show_cards_in_list(self, card_list, visible=True):
+        [cb.show_full_size(face_up=visible) for cb in self.all_card_buttons if cb.card in card_list]
 
     def clear_buttons_in(self, card_button_list):
         [cb.clear() for cb in card_button_list]
@@ -366,6 +369,10 @@ class Round:
         self.turn_up_top_card()
         self.pegging_round()
         self.hand_display(not self.player_has_box)
+        if self.player_has_box:
+            self.interface.show_cards_in_list(self.my_cards, visible=False)
+        else:
+            self.interface.show_cards_in_list(self.comp_cards, visible=False)
         self.hand_display(self.player_has_box)
         self.hand_display(self.player_has_box, is_box=True)
 
