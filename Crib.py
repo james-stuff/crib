@@ -17,14 +17,14 @@ WIN_SCORE = 121
 NUMBERS = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven',
            'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen',
            'fourteen', 'fifteen', 'sixteen']
-VERSION = '2.1.3'
+VERSION = '2.1.4'
 
 
 class Table:
     def __init__(self):
         self.gui = tkinter.Tk()
         self.gui.title('Crib!          v' + VERSION)
-        self.gui.geometry('1270x475')
+        self.gui.geometry('1270x495')
         self.gui.configure(bg='green')
 
         self.common_card_frame = tkinter.Frame(self.gui, bg='green', width=405, height=194)
@@ -56,7 +56,8 @@ class Table:
         self.player_cards_frame.columnconfigure(6, minsize=50)
 
         info_frame = tkinter.Frame(self.gui, bg='green')
-        info_frame.grid(row=1, columnspan=3, sticky='we')
+        info_frame.grid(row=1, columnspan=3, sticky='we', pady=10)
+        info_frame.columnconfigure(0, minsize=1270)
         self.score_info = tkinter.StringVar()
         self.l_score = tkinter.Label(info_frame, font=('Helvetica', 12),
                                      textvariable=self.score_info)
@@ -378,7 +379,7 @@ class Round:
 
         if self.game is not None and self.game.win_detected:
             self.interface.wait_for_ctrl_btn_click('Start new game')
-            self.interface.show_cards_in_list([self.face_up_card])
+            self.interface.show_cards_in_list([self.face_up_card], visible=False)
         if self.game is None:
             self.interface.log_file.close()
 
@@ -453,15 +454,16 @@ class Round:
                 self.reset_variables_at_31()
             elif len(self.played_cards) == 6:
                 self.award_go_point()
-            elif self.comp_knock == self.player_knock == True:
+            elif self.comp_knock and self.player_knock:
                 self.award_go_point()
                 self.reset_variables_at_31()
                 self.is_players_turn = not self.played_cards[-1] in self.my_cards
 
     def check_if_knock_required(self):
         if not self.can_go():
-            if self.is_players_turn:
-                self.interface.wait_for_ctrl_btn_click('Knock')
+            if self.is_players_turn and not self.player_knock:
+                if any(c for c in self.my_cards if c not in self.played_cards):
+                    self.interface.wait_for_ctrl_btn_click('Knock')
                 self.player_knock = True
             else:
                 self.comp_knock = True
@@ -471,6 +473,9 @@ class Round:
     def can_go(self):
         turn_dict = {True: self.my_cards, False: self.comp_cards}
         whose_hand = turn_dict[self.is_players_turn]
+        # if self.is_players_turn and not any(c not in self.played_cards for c in whose_hand):
+        #     self.player_knock = True
+        #     return False
         return any(c not in self.played_cards and self.can_play_card(c)
                    for c in whose_hand)
 
