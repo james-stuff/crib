@@ -13,7 +13,7 @@ CLUBS = '\u2663'
 DIAMONDS = '\u2666'
 SPADES = '\u2660'
 SUITS = [HEARTS, CLUBS, DIAMONDS, SPADES]
-WIN_SCORE = 121
+WIN_SCORE = 21
 NUMBERS = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven',
            'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen',
            'fourteen', 'fifteen', 'sixteen']
@@ -80,21 +80,23 @@ class Table:
     def new_game(self):
         while True:
             game = Game(self)
+            self.configure_for_new_game()
             game.play()
+
+    def configure_for_new_game(self):
+        self.btControl.configure(command=lambda: self.card_var.set(19))
+        self.score_info.set('')
+        self.l_score.configure(bg='green')
+        self.peg_board.reset()
 
     def await_control_button_click(self, instruction):
         self.card_var.set(-1)
         while self.card_var.get() != 19:
             self.btControl.configure(text=instruction)
             self.btControl.wait_variable(self.card_var)
-            # if self.card_var.get() == 20:
-            #     self.gui.destroy()
-            #     break
 
 
 class CardButton:
-    colour_dict = {CLUBS: 'black', SPADES: 'black', HEARTS: 'red', DIAMONDS: 'red'}
-
     def __init__(self, table, frame, index, col_start):
         self.table = table
         self.card = None
@@ -127,39 +129,31 @@ class CardButton:
         self.show(face_up=face_up)
         self.button.configure(width=self.full_width, anchor='center')
 
-    def hide(self):
+    def remove_from_hand(self):
         self.button.configure(image=None, text='')
         self.button.grid_forget()
 
     def clear(self):
         self.card = None
-        self.hide()
+        self.remove_from_hand()
 
 
 class Game:
     def __init__(self, table):
         self.table = table
+        self.win_detected = self.is_players_turn = False
+        self.player_has_box = random.choice([True, False])
 
     def play(self):
-        self.win_detected = False
-        self.player_has_box = random.choice([True, False])
-        self.table.btControl.configure(command=lambda: self.table.card_var.set(19))
-        self.table.score_info.set('')
-        self.table.l_score.configure(bg='green')
-        self.table.peg_board.reset()
-        this_round = None
-
+        active_round = None
         while not self.win_detected:
             self.is_players_turn = not self.player_has_box
-            self.table.await_control_button_click('Deal for new round')
-            if this_round != None:
-                this_round.interface.clear_box()
-                del (this_round)
-            this_round = Round(self)
-            this_round.play_round()
+            self.table.await_control_button_click('Deal for next round')
+            if active_round is not None:
+                active_round.interface.clear_box()
+            active_round = Round(self).play_round()
             self.player_has_box = not self.player_has_box
-        this_round.interface.clear_box()
-        del (this_round)
+        active_round.interface.clear_box()
 
 
 class RoundInterface():
@@ -184,14 +178,17 @@ class RoundInterface():
     def allocate_cards_after_deal(self, player_cards, computer_cards):
         pass
 
-    def transfer_to_box(self, card, round):
+    def transfer_to_box(self, card, pegging_round):
         pass
 
     def turn_up_top_card(self, top_card):
         pass
 
-    def player_picks_card(self, round):
+    def player_picks_card(self, pegging_round):
         pass
+
+    def log_card_played(self, players_turn, card, score_string):
+        return score_string
 
     def hide_played_card(self, card):
         pass
@@ -205,7 +202,10 @@ class RoundInterface():
     def clear_box(self):
         pass
 
-    def hand_display(self, hand, players_hand, is_box=False):
+    def hand_display(self, hand):
+        pass
+
+    def end_of_round_tidy_up(self):
         pass
 
 
@@ -224,11 +224,19 @@ class RoundTestInterface(RoundInterface):
     def turn_up_top_card(self, top_card):
         self.update_score_info('Card turned up: ' + str(top_card))
 
-    def player_picks_card(self, round):
-        return round.player_picks_card_in_test_mode()
+    def player_picks_card(self, pegging_round):
+        return pegging_round.player_picks_card_in_test_mode()
 
-    def hand_display(self, hand, is_player, is_box=False):
-        return str([str(c) for c in hand])
+    def log_card_played(self, players_turn, card, score_string):
+        dict_who = {True: 'Player  ', False: 'Computer'}
+        player = dict_who[players_turn]
+        return player + ' : ' + str(card) + '\t' + score_string
+
+    def hand_display(self, hand):
+        return str(hand)
+
+    def end_of_round_tidy_up(self):
+        self.log_file.close() # without this, Monte Carlo logging skips many rounds
 
 
 class RoundVisualInterface(RoundInterface):
@@ -285,44 +293,40 @@ class RoundVisualInterface(RoundInterface):
             cb.card = computer_cards[ind]
             cb.show(face_up=False)
 
-    def transfer_to_box(self, card, round):
-        cards_in_box = len(round.box)
+    def transfer_to_box(self, card, pegging_round):
+        cards_in_box = len(pegging_round.box_cards)
         origin_hand = {True: self.table.player_card_buttons, False: self.table.comp_card_buttons}
         destination_box = {True: self.table.player_box_buttons, False: self.table.comp_box_buttons}
-        destination_box[round.player_has_box][cards_in_box - 1].card = card
-        destination_box[round.player_has_box][cards_in_box - 1].show(face_up=False)
+        destination_box[pegging_round.player_has_box][cards_in_box - 1].card = card
+        destination_box[pegging_round.player_has_box][cards_in_box - 1].show(face_up=False)
         if cards_in_box > 1:
-            destination_box[round.player_has_box][cards_in_box - 2].reduce_width()
-        origin_cb = [cb for cb in origin_hand[round.is_players_turn] if cb.card == card][0]
-        origin_cb.hide()
+            destination_box[pegging_round.player_has_box][cards_in_box - 2].reduce_width()
+        origin_cb = [cb for cb in origin_hand[pegging_round.is_players_turn] if cb.card == card][0]
+        origin_cb.remove_from_hand()
         origin_cb.card = None
 
     def turn_up_top_card(self, top_card):
         self.table.face_up_card_buttons[0].card = top_card
         self.table.face_up_card_buttons[0].show(face_up=True)
 
-    def player_picks_card(self, round):
+    def player_picks_card(self, pegging_round):
         self.update_ctrl_btn_text('It\'s your turn!  Click a card to play it')
         card_ok = False
         while not card_ok:
             selected_card = self.wait_for_card()
-            card_ok = round.can_play_card(selected_card)
+            card_ok = pegging_round.card_is_small_enough(selected_card)
             if not card_ok:
                 self.update_score_info('Cannot play this card, too high.')
         self.hide_played_card(selected_card)
         return selected_card
 
     def hide_played_card(self, card):
-        [cb.hide() for cb in self.all_card_buttons if cb.card == card]
+        [cb.remove_from_hand() for cb in self.all_card_buttons if cb.card == card]
 
-    def hand_display(self, hand, is_player, is_box=False):
-        owner_dict = {True: 'my', False: 'computer\'s'}
-        box_or_hand_dict = {True: 'box', False: 'hand'}
-        owner = owner_dict[is_player]
-        hand_or_box = box_or_hand_dict[is_box]
-        self.wait_for_ctrl_btn_click('Show ' + owner + ' ' + hand_or_box)
-        self.show_cards_in_list(hand)
-        if is_box:
+    def hand_display(self, hand):
+        self.wait_for_ctrl_btn_click(hand.display_button_text)
+        self.show_cards_in_list(hand.cards)
+        if hand.is_box:
             self.clear_buttons_in(self.table.player_card_buttons + self.table.comp_card_buttons)
         else:
             self.clear_buttons_in(self.table.played_cards_buttons)
@@ -337,24 +341,29 @@ class RoundVisualInterface(RoundInterface):
     def clear_box(self):
         self.clear_buttons_in(self.table.player_box_buttons + self.table.comp_box_buttons)
 
+    def end_of_round_tidy_up(self):
+        self.wait_for_ctrl_btn_click('Start new game')
+        self.table.face_up_card_buttons[0].show(face_up=False)
+
 
 class Round:
     def __init__(self, game=None, cards=None, comp_cards=None):
         self.game = game
         self.my_cards = cards
         self.comp_cards = comp_cards
-        self.box = []
+        self.box_cards = []
         self.played_cards = []
         self.running_total = 0
         self.of_a_kind_count = 1
-        self.comp_knock = self.player_knock = False
+        self.is_players_turn = self.comp_knock = self.player_knock = False
         self.last_score_comment = ''
         self.the_pack = Pack()
         self.face_up_card = None
         self.computer = SmartComputer(self)
         self.who_has_it = {True: 'You have', False: 'Computer has'}
+        self.my_hand = self.comp_hand = self.box = None
 
-        if self.game is not None:
+        if self.game:
             self.player_has_box = self.game.player_has_box
             self.interface = RoundVisualInterface(self.game.table)
         else:
@@ -367,21 +376,21 @@ class Round:
         self.is_players_turn = not self.player_has_box
 
         self.build_box()
+        self.my_hand = Hand(self.my_cards, True)
+        self.comp_hand = Hand(self.comp_cards, False)
+        self.box = Hand(self.box_cards, self.player_has_box)
         self.turn_up_top_card()
         self.pegging_round()
-        self.hand_display(not self.player_has_box)
-        if self.player_has_box:
-            self.interface.show_cards_in_list(self.my_cards, visible=False)
-        else:
-            self.interface.show_cards_in_list(self.comp_cards, visible=False)
-        self.hand_display(self.player_has_box)
-        self.hand_display(self.player_has_box, is_box=True)
+        self.put_cards_on_table()
+        if self.game is None or self.game.win_detected:
+            self.interface.end_of_round_tidy_up()
 
-        if self.game is not None and self.game.win_detected:
-            self.interface.wait_for_ctrl_btn_click('Start new game')
-            self.interface.show_cards_in_list([self.face_up_card], visible=False)
-        if self.game is None:
-            self.interface.log_file.close()
+        # if self.game is not None and self.game.win_detected:
+        #     self.interface.wait_for_ctrl_btn_click('Start new game')
+        #     self.interface.show_cards_in_list([self.face_up_card], visible=False)
+        # if self.game is None:
+        #     self.interface.log_file.close()
+        return self
 
     def deal(self):
         if self.my_cards is None:
@@ -394,14 +403,14 @@ class Round:
         who_has_box = self.who_has_it[self.player_has_box] + ' the box'
         self.interface.update_score_info(who_has_box)
 
-        while len(self.box) < 4:
+        while len(self.box_cards) < 4:
             if self.is_players_turn:
-                initial_box_size = len(self.box)
+                initial_box_size = len(self.box_cards)
                 box_string = ''
-                while len(self.box) < initial_box_size + 2:
+                while len(self.box_cards) < initial_box_size + 2:
                     self.interface.update_ctrl_btn_text('Click on two cards to add them to the box')
                     card_for_box = self.interface.wait_for_card(self.my_cards)
-                    self.box.append(card_for_box)
+                    self.box_cards.append(card_for_box)
                     # find and remove the card from player's hand
                     ind = self.my_cards.index(card_for_box)
                     del (self.my_cards[ind])
@@ -417,7 +426,7 @@ class Round:
                 discards = self.computer.two_cards_for_box(self.comp_cards)
                 for disc in discards:
                     self.comp_cards.remove(disc)
-                    self.box.append(disc)
+                    self.box_cards.append(disc)
                     self.interface.transfer_to_box(disc, self)
                     self.interface.update_score_info('Computer adds ' + str(disc) +
                                                      ' to box')
@@ -462,7 +471,7 @@ class Round:
     def check_if_knock_required(self):
         if not self.can_go():
             if self.is_players_turn and not self.player_knock:
-                if any(c for c in self.my_cards if c not in self.played_cards):
+                if self.my_hand.get_playable_cards(self.played_cards):
                     self.interface.wait_for_ctrl_btn_click('Knock')
                 self.player_knock = True
             else:
@@ -471,21 +480,17 @@ class Round:
                                                  '\tComputer knocks.')
 
     def can_go(self):
-        turn_dict = {True: self.my_cards, False: self.comp_cards}
+        turn_dict = {True: self.my_hand, False: self.comp_hand}
         whose_hand = turn_dict[self.is_players_turn]
-        # if self.is_players_turn and not any(c not in self.played_cards for c in whose_hand):
-        #     self.player_knock = True
-        #     return False
-        return any(c not in self.played_cards and self.can_play_card(c)
-                   for c in whose_hand)
+        return any(self.card_is_small_enough(c) for c in
+                   whose_hand.get_playable_cards(self.played_cards))
 
-    def can_play_card(self, card):
+    def card_is_small_enough(self, card):
         return self.running_total + card.value <= 31
 
     def player_picks_card_in_test_mode(self):
-        available_cards = [c for c in self.my_cards if c not in self.played_cards]
-        for card in available_cards:
-            if self.can_play_card(card):
+        for card in self.my_hand.get_playable_cards(self.played_cards):
+            if self.card_is_small_enough(card):
                 selected_card = card
                 break
         return selected_card
@@ -516,11 +521,8 @@ class Round:
 
         score_string = run_tot_text + for_text + win_str
         self.last_score_comment = score_string
-        if self.game is None:
-            dict_who = {True: 'Player  ', False: 'Computer'}
-            player = dict_who[self.is_players_turn]
-            score_string = player + ' : ' + str(card_played) + '\t' + score_string
-        self.interface.update_score_info(score_string)
+        self.interface.update_score_info(self.interface.log_card_played(self.is_players_turn,
+                                                                        card_played, score_string))
 
     def update_round_state_with_played_card(self, card_played):
         self.played_cards.append(card_played)
@@ -590,18 +592,23 @@ class Round:
         self.interface.turn_over_played_cards_on_next_turn = True
         self.last_score_comment = ''
 
-    def hand_display(self, is_player, is_box=False):
-        hand_dict = {True: self.my_cards, False: self.comp_cards}
-        hand_to_score = hand_dict[is_player]
-        if is_box:
-            hand_to_score = self.box
+    def put_cards_on_table(self):
+        hands = [self.my_hand, self.comp_hand]
+        display_order = [0, 1]
+        if self.player_has_box:
+            display_order = display_order[::-1]
+        self.evaluate_hand(hands[display_order[0]])
+        self.interface.show_cards_in_list(hands[display_order[1]].cards, visible=False)
+        self.evaluate_hand(hands[display_order[1]])
+        self.evaluate_hand(self.box)
 
-        int_score, text_score = score_hand(hand_to_score + [self.face_up_card])
-        str_info = text_score + ' is ' + str(int_score)
-        str_info = self.interface.hand_display(hand_to_score, is_player, is_box) + str_info
+    def evaluate_hand(self, hand_to_score):
+        hs = HandScore(hand_to_score, self.face_up_card)
+        str_info = str(hs)
+        str_info = self.interface.hand_display(hand_to_score) + str_info
 
-        new_score = self.interface.update_pegs(is_player, int_score)
-        str_info += self.check_for_win(is_player, new_score)
+        new_score = self.interface.update_pegs(hand_to_score.belongs_to_player, hs.points_value)
+        str_info += self.check_for_win(hand_to_score.belongs_to_player, new_score)
         self.interface.update_score_info(str_info)
 
 
@@ -683,7 +690,7 @@ class SmartComputer:
     def card_to_play(self):
         cards_down = self.round.played_cards
         available_cards = [c for c in self.round.comp_cards if
-                           c not in cards_down and self.round.can_play_card(c)]
+                           c not in cards_down and self.round.card_is_small_enough(c)]
         if len(available_cards) == 1:
             return available_cards[0]
 
@@ -805,9 +812,8 @@ class Card():
         self.rank = rank
         self.suit = suit
 
-        if rank <= 10:
-            self.value = rank
-        elif rank in range(11, 14):
+        self.value = rank
+        if rank in range(11, 14):
             self.value = 10
 
     def __str__(self):
@@ -827,10 +833,6 @@ def pair_counter(list_of_pairs, matching_test, value=0):
 
 def is_pair(two_cards, unused_value=0):
     return two_cards[0].rank == two_cards[1].rank
-
-
-def adds_up_to(two_cards, target_value):
-    return two_cards[0].value + two_cards[1].value == target_value
 
 
 def its_a_run(card_list):
@@ -869,7 +871,6 @@ def runs_in_pegging(cards_played):
 
 
 class Flush:
-
     def __init__(self, hand):
         self.hand = hand
         self.points = 0
@@ -890,11 +891,9 @@ class Flush:
 
 
 class Runs:
-
     def __init__(self, hand):
         self.hand = hand
-        self.length = 0
-        self.instances = 0
+        self.length = self.instances = 0
 
     def find_runs(self):
         # get every combination from length of hand downwards
@@ -910,15 +909,12 @@ class Runs:
 
     def __str__(self):
         if self.length:
-            run_or_runs = ' run'
-            if self.instances > 1:
-                run_or_runs += 's'
+            run_or_runs = pluralise_if_necessary(' run', self.instances)
             return ', ' + NUMBERS[self.instances] + run_or_runs + ' of ' + NUMBERS[self.length]
         return ''
 
 
 class Fifteens:
-
     def __init__(self, hand):
         self.hand = hand
         self.fifteens = 0
@@ -929,6 +925,12 @@ class Fifteens:
                 if sum([card.value for card in list(combo)]) == 15:
                     self.fifteens += 1
         return self.fifteens
+
+
+def pluralise_if_necessary(word, count):
+    if count > 1:
+        return word + 's'
+    return word
 
 
 def score_hand(hand):
@@ -956,9 +958,7 @@ def score_hand(hand):
     pairs = pair_counter(find_all_possible_pairs_in(hand), is_pair)
     score_int += pairs * 2
     if pairs > 0:
-        score_text += ', ' + NUMBERS[pairs] + ' pair'
-        if pairs > 1:
-            score_text += 's'
+        score_text += ', ' + NUMBERS[pairs] + pluralise_if_necessary(' pair', pairs)
 
     if score_int == 4 and pairs == 2:
         score_text = 'Morgan\'s Orchard'
@@ -988,6 +988,40 @@ def score_hand(hand):
             score_text = score_text[:last_comma] + ' and' + score_text[last_comma + 1:]
 
     return score_int, score_text
+
+
+class Hand:
+    def __init__(self, cards, belongs_to_player):
+        self.cards = cards
+        self.belongs_to_player = belongs_to_player
+        self.is_box = len(cards) == 4
+        self.display_button_text = self.set_display_button_text()
+
+    def set_display_button_text(self):
+        owner_dict = {True: 'my', False: 'computer\'s'}
+        box_or_hand_dict = {True: 'box', False: 'hand'}
+        owner = owner_dict[self.belongs_to_player]
+        hand_or_box = box_or_hand_dict[self.is_box]
+        return 'Show ' + owner + ' ' + hand_or_box
+
+    def get_playable_cards(self, played_already):
+        return [c for c in self.cards if c not in played_already]
+
+    def __str__(self):
+        return str([str(c) for c in self.cards])
+
+
+class HandScore:
+    def __init__(self, hand, face_up_card):
+        self.points_value = 0
+        self.description = ''
+        self.calculate_with_face_up_card(hand, face_up_card)
+
+    def calculate_with_face_up_card(self, hand, face_up_card):
+        self.points_value, self.description = score_hand(hand.cards + [face_up_card])
+
+    def __str__(self):
+        return self.description + ' is ' + str(self.points_value)
 
 
 if __name__ == '__main__':

@@ -254,5 +254,33 @@ class CribTest(unittest.TestCase):
             cards.append(Crib.Card(rank, c[1]))
         return cards
 
+    def test_player_hand(self):
+        hand = Crib.Hand([Crib.Card(3, HEARTS), Crib.Card(6, DIAMONDS), Crib.Card(10, CLUBS)], True)
+        self.assertEqual('Show my hand', hand.display_button_text)
+
+    def test_computer_box(self):
+        hand = Crib.Hand([Crib.Card(7, HEARTS), Crib.Card(8, DIAMONDS), Crib.Card(11, CLUBS),
+                          Crib.Card(13, HEARTS)], False)
+        self.assertEqual('Show computer\'s box', hand.display_button_text)
+
+    def test_no_cards_left(self):
+        hand = Crib.Hand([Crib.Card(3, HEARTS), Crib.Card(6, DIAMONDS), Crib.Card(10, CLUBS)], True)
+        played_cards = [Crib.Card(2, HEARTS), Crib.Card(1, CLUBS)] + hand.cards
+        self.assertFalse(hand.get_playable_cards(played_cards))
+
+    def test_three_cards_left(self):
+        hand = Crib.Hand([Crib.Card(3, HEARTS), Crib.Card(6, DIAMONDS), Crib.Card(10, CLUBS)], True)
+        played_cards = [Crib.Card(2, HEARTS), Crib.Card(1, CLUBS)]
+        self.assertEqual(3, len(hand.get_playable_cards(played_cards)))
+
+    def test_hand_score(self):
+        hand = Crib.Hand([Crib.Card(11, HEARTS), Crib.Card(10, CLUBS), Crib.Card(12, HEARTS),
+                          Crib.Card(11, CLUBS)], True)
+        hs = Crib.HandScore(hand, Crib.Card(9, DIAMONDS))
+        # hs.calculate_with_face_up_card(hand, Crib.Card(9, DIAMONDS))
+        print(hs)
+        self.assertEqual(10, hs.points_value)
+
+
 if __name__ == '__main__':
     unittest.main()
