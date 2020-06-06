@@ -13,7 +13,7 @@ CLUBS = '\u2663'
 DIAMONDS = '\u2666'
 SPADES = '\u2660'
 SUITS = [HEARTS, CLUBS, DIAMONDS, SPADES]
-WIN_SCORE = 21
+WIN_SCORE = 121
 NUMBERS = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven',
            'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen',
            'fourteen', 'fifteen', 'sixteen']
@@ -153,6 +153,8 @@ class Game:
                 active_round.interface.clear_box()
             active_round = Round(self).play_round()
             self.player_has_box = not self.player_has_box
+        active_round.interface.wait_for_ctrl_btn_click('Start new game')
+        self.table.face_up_card_buttons[0].show(face_up=False)
         active_round.interface.clear_box()
 
 
@@ -341,10 +343,6 @@ class RoundVisualInterface(RoundInterface):
     def clear_box(self):
         self.clear_buttons_in(self.table.player_box_buttons + self.table.comp_box_buttons)
 
-    def end_of_round_tidy_up(self):
-        self.wait_for_ctrl_btn_click('Start new game')
-        self.table.face_up_card_buttons[0].show(face_up=False)
-
 
 class Round:
     def __init__(self, game=None, cards=None, comp_cards=None):
@@ -382,14 +380,8 @@ class Round:
         self.turn_up_top_card()
         self.pegging_round()
         self.put_cards_on_table()
-        if self.game is None or self.game.win_detected:
-            self.interface.end_of_round_tidy_up()
-
-        # if self.game is not None and self.game.win_detected:
-        #     self.interface.wait_for_ctrl_btn_click('Start new game')
-        #     self.interface.show_cards_in_list([self.face_up_card], visible=False)
-        # if self.game is None:
-        #     self.interface.log_file.close()
+        # if self.game is None or self.game.win_detected:
+        self.interface.end_of_round_tidy_up()
         return self
 
     def deal(self):
