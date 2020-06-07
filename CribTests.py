@@ -251,6 +251,18 @@ class CribTest(unittest.TestCase):
         print('\n', hs)
         self.assertEqual(17, hs.points_value)
 
+    def test_hand_score_fifteens_and_nothing_else(self):
+        hand = Crib.Hand([cc(5, HEARTS), cc(10, CLUBS), cc(12, HEARTS), cc(13, CLUBS)], True)
+        hs = Crib.HandScore(hand, cc(2, DIAMONDS))
+        print('\n', hs)
+        self.assertEqual(6, hs.points_value)
+
+    def test_morgans_orchard_and_one_for_his_knob(self):
+        hand = Crib.Hand([cc(4, HEARTS), cc(11, HEARTS), cc(11, CLUBS)], False)
+        hs = Crib.HandScore(hand, cc(4, CLUBS))
+        print('\n', hs)
+        self.assertEqual(5, hs.points_value)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -658,7 +658,7 @@ class SmartComputer:
         all_pairs = find_all_possible_pairs_in(dealt_hand)
         for pair in all_pairs:
             triplet = [c for c in dealt_hand if c not in pair]
-            all_triplets_scored.append([triplet, score_hand(triplet)[0]])
+            all_triplets_scored.append([triplet, HandScore(Hand(triplet, False)).points_value])
 
         self.refine_box_selection(all_triplets_scored)
         all_triplets_scored.sort(key=lambda tr: tr[1], reverse=True)
@@ -827,12 +827,7 @@ class PegRow():
 
 class Pack():
     def __init__(self):
-        # generate the pack of 52 cards:
-        self.pack = []
-
-        for suit in SUITS:
-            for number in range(1, 14):
-                self.pack.append(Card(number, suit))
+        self.pack = [Card(rank, suit) for rank in range(1, 14) for suit in SUITS]
         random.shuffle(self.pack)
 
     def deal(self, how_many_cards):
@@ -845,7 +840,6 @@ class Card():
     def __init__(self, rank, suit):
         self.rank = rank
         self.suit = suit
-
         self.value = rank
         if rank in range(11, 14):
             self.value = 10
@@ -904,152 +898,10 @@ def runs_in_pegging(cards_played):
     return 0
 
 
-# class ScoreType:
-#     def __init__(self, cards):
-#         self.cards = cards
-#         self.instances = self.points = 0
-#         self.score_text = ''
-#
-#     def count(self):
-#         pass
-#
-#     def __str__(self):
-#         return self.score_text
-#
-#
-# class Flush(ScoreType):
-#     def __init__(self, cards):
-#         super(Flush, self).__init__(cards)
-#
-#     def count(self):
-#         flush_suit = self.cards[0].suit
-#         flush_length = len([c for c in self.cards if c.suit == flush_suit])
-#         if flush_length == len(self.cards):
-#             self.points = flush_length
-#         if len(self.cards) == 4 and flush_length == 3 and self.cards[-1].suit != flush_suit:
-#             self.points = 3
-#         if self.points:
-#             self.score_text = ', a flush of ' + NUMBERS[self.points]
-#         return self
-#
-#
-# class Runs(ScoreType):
-#     def __init__(self, cards):
-#         super(Runs, self).__init__(cards)
-#         self.length = 0
-#
-#     def count(self):
-#         # get every combination from length of hand downwards
-#         # if the whole hand is a run, can stop there
-#         for run_length in range(len(self.cards), 2, -1):
-#             combos = itertools.combinations(self.cards, run_length)
-#             for comb in combos:
-#                 if its_a_run(comb):
-#                     self.instances += 1
-#                     self.length = run_length
-#             if self.instances:
-#                 self.points = self.instances * self.length
-#                 run_or_runs = pluralise_if_necessary(' run', self.instances)
-#                 self.score_text = ', ' + NUMBERS[self.instances] + run_or_runs + ' of ' + \
-#                                   NUMBERS[self.length]
-#                 break
-#         return self
-#
-#
-# class Pairs(ScoreType):
-#     def __init__(self, cards):
-#         super(Pairs, self).__init__(cards)
-#
-#     def count(self):
-#         ct = self.instances = pair_counter(find_all_possible_pairs_in(self.cards), is_pair)
-#         self.points = ct * 2
-#         if ct:
-#             self.score_text = ', ' + NUMBERS[ct] + pluralise_if_necessary(' pair', ct)
-#         return self
-#
-#
-# class Fifteens(ScoreType):
-#     def __init__(self, cards):
-#         super(Fifteens, self).__init__(cards)
-#
-#     def count(self):
-#         for combo_length in range(2, len(self.cards) + 1):
-#             for combo in itertools.combinations(self.cards, combo_length):
-#                 if sum([card.value for card in list(combo)]) == 15:
-#                     self.instances += 1
-#         self.points = self.instances * 2
-#         for f in range(1, self.instances + 1):
-#             self.score_text += ', ' + NUMBERS[15] + ' ' + NUMBERS[f * 2]
-#         return self
-#
-#
-# class Knob(ScoreType):
-#     def __init__(self, cards):
-#         super(Knob, self).__init__(cards)
-#
-#     def count(self, face_up_card=None):
-#         if face_up_card:
-#             if [c for c in self.cards if c.rank == 11 and c.suit == face_up_card.suit]:
-#                 self.points = 1
-#                 self.score_text += ', one for his knob'
-#
-#
 def pluralise_if_necessary(word, count):
     if count > 1:
         return word + 's'
     return word
-
-
-def score_hand(hand):
-    score_text = ''
-
-    fifteens = Fifteens(hand).count_fifteens()
-    score_int = fifteens * 2
-    for f in range(1, fifteens + 1):
-        score_text += ', ' + NUMBERS[15] + ' ' + NUMBERS[f * 2]
-
-    sorted_hand = sorted(hand, key=lambda c: c.rank)
-    run_counter = Runs(sorted_hand)
-    run_counter.count()
-    score_int += run_counter.instances * run_counter.length
-    score_text += str(run_counter)
-
-    flush_counter = Flush(hand)
-    score_int += flush_counter.points()
-    score_text += str(flush_counter)
-
-    pairs = pair_counter(find_all_possible_pairs_in(hand), is_pair)
-    score_int += pairs * 2
-    if pairs > 0:
-        score_text += ', ' + NUMBERS[pairs] + pluralise_if_necessary(' pair', pairs)
-
-    if score_int == 4 and pairs == 2:
-        score_text = 'Morgan\'s Orchard'
-
-    if len(hand) > 3:
-        knob = [c for c in hand[:-1] if c.rank == 11 and c.suit == hand[-1].suit]
-        if len(knob) == 1:
-            score_int += 1
-            score_text += ', one for his knob'
-
-    if score_int == 0:
-        odd_card_found = len([c for c in hand if c.rank % 2 == 1])
-        if not odd_card_found:
-            score_text = 'two, four, six, eight, Blotchy Bob!'
-        else:
-            score_text = 'zero points'
-
-    if score_text[:2] == ', ':
-        score_text = score_text[2:]
-    score_text = score_text[0].upper() + score_text[1:]
-
-    # slip in an 'and' at the end if there are multiple scoring types
-    last_comma = score_text.rfind(',')
-    if last_comma > 0:
-        if 'Bob' not in score_text and not score_int == fifteens * 2:
-            score_text = score_text[:last_comma] + ' and' + score_text[last_comma + 1:]
-
-    return score_int, score_text
 
 
 class Hand:
@@ -1087,9 +939,10 @@ class HandScore:
 
     def calculate(self):
         [getattr(self, m)() for m in self.__dir__() if 'count' in m]
-        if self.points_value == 4 and self.two_pairs:
-            # TODO: what about Morgan's Orchard and one for his knob?
+        if self.points_value in [4, 5] and self.two_pairs:
             self.description = 'Morgan\'s Orchard'
+            if self.points_value == 5:
+                self.description += ' and one for his knob'
         if self.points_value == 0:
             self.description = 'zero points'
             if not [c for c in self.all_cards if c.rank % 2 == 1]:
@@ -1156,7 +1009,7 @@ class HandScore:
             desc = desc[:-2]
         last_comma = desc.rfind(',')
         if last_comma > 0:
-            if 'Bob' not in desc:
+            if 'Bob' not in desc and desc.split()[-2] != 'fifteen':
                 desc = desc[:last_comma] + ' and' + desc[last_comma + 1:]
         desc = desc[0].upper() + desc[1:]
         return desc + ' is ' + str(self.points_value)
