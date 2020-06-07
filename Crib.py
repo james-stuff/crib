@@ -17,7 +17,7 @@ WIN_SCORE = 121
 NUMBERS = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven',
            'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen',
            'fourteen', 'fifteen', 'sixteen']
-VERSION = '2.1.4'
+VERSION = '2.1.5'
 
 
 class Table:
@@ -904,63 +904,96 @@ def runs_in_pegging(cards_played):
     return 0
 
 
-class Flush:
-    def __init__(self, hand):
-        self.hand = hand
-        self.points = 0
-
-    def flush_points(self):
-        flush_suit = self.hand[0].suit
-        flush_length = len([c for c in self.hand if c.suit == flush_suit])
-        if flush_length == len(self.hand):
-            self.points = flush_length
-        if len(self.hand) == 4 and flush_length == 3 and self.hand[-1].suit != flush_suit:
-            self.points = 3
-        return self.points
-
-    def __str__(self):
-        if self.points > 0:
-            return ', a flush of ' + NUMBERS[self.points]
-        return ''
-
-
-class Runs:
-    def __init__(self, hand):
-        self.hand = hand
-        self.length = self.instances = 0
-
-    def find_runs(self):
-        # get every combination from length of hand downwards
-        # if the whole hand is a run, can stop there
-        for run_length in range(len(self.hand), 2, -1):
-            combos = itertools.combinations(self.hand, run_length)
-            for comb in combos:
-                if its_a_run(comb):
-                    self.instances += 1
-                    self.length = run_length
-            if self.instances > 0:
-                break
-
-    def __str__(self):
-        if self.length:
-            run_or_runs = pluralise_if_necessary(' run', self.instances)
-            return ', ' + NUMBERS[self.instances] + run_or_runs + ' of ' + NUMBERS[self.length]
-        return ''
-
-
-class Fifteens:
-    def __init__(self, hand):
-        self.hand = hand
-        self.fifteens = 0
-
-    def count_fifteens(self):
-        for combo_length in range(2, len(self.hand) + 1):
-            for combo in itertools.combinations(self.hand, combo_length):
-                if sum([card.value for card in list(combo)]) == 15:
-                    self.fifteens += 1
-        return self.fifteens
-
-
+# class ScoreType:
+#     def __init__(self, cards):
+#         self.cards = cards
+#         self.instances = self.points = 0
+#         self.score_text = ''
+#
+#     def count(self):
+#         pass
+#
+#     def __str__(self):
+#         return self.score_text
+#
+#
+# class Flush(ScoreType):
+#     def __init__(self, cards):
+#         super(Flush, self).__init__(cards)
+#
+#     def count(self):
+#         flush_suit = self.cards[0].suit
+#         flush_length = len([c for c in self.cards if c.suit == flush_suit])
+#         if flush_length == len(self.cards):
+#             self.points = flush_length
+#         if len(self.cards) == 4 and flush_length == 3 and self.cards[-1].suit != flush_suit:
+#             self.points = 3
+#         if self.points:
+#             self.score_text = ', a flush of ' + NUMBERS[self.points]
+#         return self
+#
+#
+# class Runs(ScoreType):
+#     def __init__(self, cards):
+#         super(Runs, self).__init__(cards)
+#         self.length = 0
+#
+#     def count(self):
+#         # get every combination from length of hand downwards
+#         # if the whole hand is a run, can stop there
+#         for run_length in range(len(self.cards), 2, -1):
+#             combos = itertools.combinations(self.cards, run_length)
+#             for comb in combos:
+#                 if its_a_run(comb):
+#                     self.instances += 1
+#                     self.length = run_length
+#             if self.instances:
+#                 self.points = self.instances * self.length
+#                 run_or_runs = pluralise_if_necessary(' run', self.instances)
+#                 self.score_text = ', ' + NUMBERS[self.instances] + run_or_runs + ' of ' + \
+#                                   NUMBERS[self.length]
+#                 break
+#         return self
+#
+#
+# class Pairs(ScoreType):
+#     def __init__(self, cards):
+#         super(Pairs, self).__init__(cards)
+#
+#     def count(self):
+#         ct = self.instances = pair_counter(find_all_possible_pairs_in(self.cards), is_pair)
+#         self.points = ct * 2
+#         if ct:
+#             self.score_text = ', ' + NUMBERS[ct] + pluralise_if_necessary(' pair', ct)
+#         return self
+#
+#
+# class Fifteens(ScoreType):
+#     def __init__(self, cards):
+#         super(Fifteens, self).__init__(cards)
+#
+#     def count(self):
+#         for combo_length in range(2, len(self.cards) + 1):
+#             for combo in itertools.combinations(self.cards, combo_length):
+#                 if sum([card.value for card in list(combo)]) == 15:
+#                     self.instances += 1
+#         self.points = self.instances * 2
+#         for f in range(1, self.instances + 1):
+#             self.score_text += ', ' + NUMBERS[15] + ' ' + NUMBERS[f * 2]
+#         return self
+#
+#
+# class Knob(ScoreType):
+#     def __init__(self, cards):
+#         super(Knob, self).__init__(cards)
+#
+#     def count(self, face_up_card=None):
+#         if face_up_card:
+#             if [c for c in self.cards if c.rank == 11 and c.suit == face_up_card.suit]:
+#                 self.points = 1
+#                 self.score_text += ', one for his knob'
+#
+#
 def pluralise_if_necessary(word, count):
     if count > 1:
         return word + 's'
@@ -970,25 +1003,21 @@ def pluralise_if_necessary(word, count):
 def score_hand(hand):
     score_text = ''
 
-    # how many fifteens?
     fifteens = Fifteens(hand).count_fifteens()
     score_int = fifteens * 2
     for f in range(1, fifteens + 1):
         score_text += ', ' + NUMBERS[15] + ' ' + NUMBERS[f * 2]
 
-    # Any runs?
     sorted_hand = sorted(hand, key=lambda c: c.rank)
     run_counter = Runs(sorted_hand)
-    run_counter.find_runs()
+    run_counter.count()
     score_int += run_counter.instances * run_counter.length
     score_text += str(run_counter)
 
-    # Any flushes?
     flush_counter = Flush(hand)
-    score_int += flush_counter.flush_points()
+    score_int += flush_counter.points()
     score_text += str(flush_counter)
 
-    # How many pairs?
     pairs = pair_counter(find_all_possible_pairs_in(hand), is_pair)
     score_int += pairs * 2
     if pairs > 0:
@@ -997,7 +1026,6 @@ def score_hand(hand):
     if score_int == 4 and pairs == 2:
         score_text = 'Morgan\'s Orchard'
 
-    # one for his knob (assumes face-up card was appended to hand)
     if len(hand) > 3:
         knob = [c for c in hand[:-1] if c.rank == 11 and c.suit == hand[-1].suit]
         if len(knob) == 1:
@@ -1046,16 +1074,92 @@ class Hand:
 
 
 class HandScore:
-    def __init__(self, hand, face_up_card):
+    def __init__(self, hand, face_up_card=None):
         self.points_value = 0
         self.description = ''
-        self.calculate_with_face_up_card(hand, face_up_card)
+        self.hand_cards = hand.cards
+        self.all_cards = hand.cards
+        self.face_up_card = face_up_card
+        if face_up_card:
+            self.all_cards = hand.cards + [face_up_card]
+        self.two_pairs = False
+        self.calculate()
 
-    def calculate_with_face_up_card(self, hand, face_up_card):
-        self.points_value, self.description = score_hand(hand.cards + [face_up_card])
+    def calculate(self):
+        [getattr(self, m)() for m in self.__dir__() if 'count' in m]
+        if self.points_value == 4 and self.two_pairs:
+            # TODO: what about Morgan's Orchard and one for his knob?
+            self.description = 'Morgan\'s Orchard'
+        if self.points_value == 0:
+            self.description = 'zero points'
+            if not [c for c in self.all_cards if c.rank % 2 == 1]:
+                self.description = 'two, four, six, eight, Blotchy Bob!'
+
+    def count_fifteens(self):
+        instances = 0
+        for combo_length in range(2, len(self.all_cards) + 1):
+            for combo in itertools.combinations(self.all_cards, combo_length):
+                if sum([card.value for card in list(combo)]) == 15:
+                    instances += 1
+        self.points_value += instances * 2
+        for f in range(1, instances + 1):
+            self.description += NUMBERS[15] + ' ' + NUMBERS[f * 2] + ', '
+        return
+
+    def count_runs(self):
+        # get every combination from length of hand downwards
+        # if the whole hand is a run, can stop there
+        instances = length = 0
+        for run_length in range(len(self.all_cards), 2, -1):
+            combos = itertools.combinations(self.all_cards, run_length)
+            for comb in combos:
+                if its_a_run(comb):
+                    instances += 1
+                    length = run_length
+            if instances:
+                self.points_value += instances * length
+                run_or_runs = pluralise_if_necessary(' run', instances)
+                self.description += NUMBERS[instances] + run_or_runs + ' of ' + NUMBERS[length] + ', '
+                break
+        return
+
+    def count_flush(self):
+        flush_suit = self.all_cards[0].suit
+        flush_length = len([c for c in self.all_cards if c.suit == flush_suit])
+        points_awarded = 0
+        if flush_length == len(self.all_cards):
+            points_awarded = flush_length
+        if len(self.all_cards) == 4 and flush_length == 3 and self.all_cards[-1].suit != flush_suit:
+            points_awarded = 3
+        if points_awarded:
+            self.points_value += points_awarded
+            self.description += 'a flush of ' + NUMBERS[points_awarded] + ', '
+        return
+
+    def count_pairs(self):
+        ct = pair_counter(find_all_possible_pairs_in(self.all_cards), is_pair)
+        self.points_value += ct * 2
+        if ct:
+            self.two_pairs = ct == 2
+            self.description += NUMBERS[ct] + pluralise_if_necessary(' pair', ct) + ', '
+        return
+
+    def count_knob(self):
+        if self.face_up_card:
+            if [c for c in self.hand_cards if c.rank == 11 and c.suit == self.face_up_card.suit]:
+                self.points_value += 1
+                self.description += 'one for his knob'
 
     def __str__(self):
-        return self.description + ' is ' + str(self.points_value)
+        desc = self.description
+        if desc[-2:] == ', ':
+            desc = desc[:-2]
+        last_comma = desc.rfind(',')
+        if last_comma > 0:
+            if 'Bob' not in desc:
+                desc = desc[:last_comma] + ' and' + desc[last_comma + 1:]
+        desc = desc[0].upper() + desc[1:]
+        return desc + ' is ' + str(self.points_value)
 
 
 if __name__ == '__main__':
