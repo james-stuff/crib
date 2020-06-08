@@ -17,7 +17,7 @@ WIN_SCORE = 121
 NUMBERS = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven',
            'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen',
            'fourteen', 'fifteen', 'sixteen']
-VERSION = '2.1.5'
+VERSION = '2.1.6'
 
 
 class Table:
@@ -82,7 +82,12 @@ class Table:
         while self.card_var.get() != 20:
             game = Game(self)
             self.configure_for_new_game()
-            game.play()
+            try:
+                game.play()
+            except RuntimeError:
+                break
+            except tkinter.TclError:
+                break
 
     def configure_for_new_game(self):
         self.btControl.configure(command=lambda: self.card_var.set(19))
@@ -99,6 +104,9 @@ class Table:
     def get_me_out_of_here(self):
         self.card_var.set(20)
         self.gui.destroy()
+
+    def show_error(self, *args):
+        raise RuntimeError('TkInter issue')
 
 
 class CardButton:
@@ -118,7 +126,7 @@ class CardButton:
     def show(self, face_up=False):
         show_border = False
         if face_up:
-            suits_dict = {CLUBS: 'clubs', DIAMONDS: 'diamonds', SPADES: 'spades', HEARTS: 'hearts'}
+            suits_dict = {globals()[g]: g.lower() for g in globals().keys() if globals()[g] in SUITS}
             im_file = 'Images\\' + str(self.card)[:-1] + suits_dict[str(self.card)[-1]] + '.png'
             self.image = tkinter.PhotoImage(file=im_file)
         else:
@@ -154,22 +162,13 @@ class Game:
         while not self.win_detected:
             self.is_players_turn = not self.player_has_box
             self.table.await_control_button_click('Deal for next round')
-            if self.close_initiated():
-                return
             if active_round:
                 active_round.interface.clear_box()
             active_round = Round(self).play_round()
-            if self.close_initiated():
-                return
             self.player_has_box = not self.player_has_box
         active_round.interface.wait_for_ctrl_btn_click('Start new game')
-        if self.close_initiated():
-            return
         self.table.face_up_card_buttons[0].show(face_up=False)
         active_round.interface.clear_box()
-
-    def close_initiated(self):
-        return self.table.card_var.get() == 20
 
 
 class RoundInterface():
@@ -223,9 +222,6 @@ class RoundInterface():
 
     def end_of_round_tidy_up(self):
         pass
-
-    def window_closing(self):
-        return False
 
 
 class RoundTestInterface(RoundInterface):
@@ -298,8 +294,6 @@ class RoundVisualInterface(RoundInterface):
         self.table.card_var.set(-1)
         while self.table.card_var.get() < 0 or self.table.card_var.get() > 4:
             self.table.btControl.wait_variable(self.table.card_var)
-            if self.window_closing():
-                return None
         our_card_number = self.table.card_var.get()
         poss_card = [c for c in self.table.player_card_buttons if c.clickable_button_id == our_card_number]
         return poss_card[0].card
@@ -335,8 +329,6 @@ class RoundVisualInterface(RoundInterface):
         card_ok = False
         while not card_ok:
             selected_card = self.wait_for_card()
-            if self.window_closing():
-                return None
             card_ok = pegging_round.card_is_small_enough(selected_card)
             if not card_ok:
                 self.update_score_info('Cannot play this card, too high.')
@@ -348,12 +340,11 @@ class RoundVisualInterface(RoundInterface):
 
     def hand_display(self, hand):
         self.wait_for_ctrl_btn_click(hand.display_button_text)
-        if not self.window_closing():
-            self.show_cards_in_list(hand.cards)
-            if hand.is_box:
-                self.clear_buttons_in(self.table.player_card_buttons + self.table.comp_card_buttons)
-            else:
-                self.clear_buttons_in(self.table.played_cards_buttons)
+        self.show_cards_in_list(hand.cards)
+        if hand.is_box:
+            self.clear_buttons_in(self.table.player_card_buttons + self.table.comp_card_buttons)
+        else:
+            self.clear_buttons_in(self.table.played_cards_buttons)
         return ''
 
     def show_cards_in_list(self, card_list, visible=True):
@@ -364,9 +355,6 @@ class RoundVisualInterface(RoundInterface):
 
     def clear_box(self):
         self.clear_buttons_in(self.table.player_box_buttons + self.table.comp_box_buttons)
-
-    def window_closing(self):
-        return self.table.card_var.get() == 20
 
 
 class Round:
@@ -397,17 +385,12 @@ class Round:
         if self.game is None:
             self.player_has_box = random.choice([True, False])
         self.is_players_turn = not self.player_has_box
-
         self.build_box()
-        if self.interface.window_closing():
-            return self
         self.my_hand = Hand(self.my_cards, True)
         self.comp_hand = Hand(self.comp_cards, False)
         self.box = Hand(self.box_cards, self.player_has_box)
         self.turn_up_top_card()
         self.pegging_round()
-        if self.interface.window_closing():
-            return self
         self.put_cards_on_table()
         self.interface.end_of_round_tidy_up()
         return self
@@ -445,8 +428,6 @@ class Round:
             else:
                 # computer adds two cards to the box
                 self.interface.wait_for_ctrl_btn_click('Add cards to box for computer')
-                if self.interface.window_closing():
-                    return
                 discards = self.computer.two_cards_for_box(self.comp_cards)
                 for disc in discards:
                     self.comp_cards.remove(disc)
@@ -480,8 +461,6 @@ class Round:
             if type(card_to_play) == Card:
                 self.play_card(card_to_play)
                 self.interface.update_played_cards(self.played_cards)
-            elif self.interface.window_closing():
-                return
             self.is_players_turn = not self.is_players_turn
 
             # when to reset to zero:
@@ -523,8 +502,6 @@ class Round:
 
     def computer_picks_card(self):
         self.interface.wait_for_ctrl_btn_click('Computer\'s turn')
-        if self.interface.window_closing():
-            return None
         selected_card = self.computer.card_to_play()
         self.interface.hide_played_card(selected_card)
         return selected_card
@@ -626,20 +603,14 @@ class Round:
         if self.player_has_box:
             display_order = display_order[::-1]
         self.evaluate_hand(hands[display_order[0]])
-        if self.interface.window_closing():
-            return
         self.interface.show_cards_in_list(hands[display_order[1]].cards, visible=False)
         self.evaluate_hand(hands[display_order[1]])
-        if self.interface.window_closing():
-            return
         self.evaluate_hand(self.box)
 
     def evaluate_hand(self, hand_to_score):
         hs = HandScore(hand_to_score, self.face_up_card)
         str_info = str(hs)
         str_info = self.interface.hand_display(hand_to_score) + str_info
-        if self.interface.window_closing():
-            return
 
         new_score = self.interface.update_pegs(hand_to_score.belongs_to_player, hs.points_value)
         str_info += self.check_for_win(hand_to_score.belongs_to_player, new_score)
