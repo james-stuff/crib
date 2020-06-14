@@ -232,12 +232,12 @@ class CribTest(unittest.TestCase):
     def test_no_cards_left(self):
         hand = Crib.Hand([cc(3, HEARTS), cc(6, DIAMONDS), cc(10, CLUBS)], True)
         played_cards = [cc(2, HEARTS), cc(1, CLUBS)] + hand.cards
-        self.assertFalse(hand.get_playable_cards(played_cards))
+        self.assertFalse(hand.get_unplayed_cards(played_cards))
 
     def test_three_cards_left(self):
         hand = Crib.Hand([cc(3, HEARTS), cc(6, DIAMONDS), cc(10, CLUBS)], True)
         played_cards = [cc(2, HEARTS), cc(1, CLUBS)]
-        self.assertEqual(3, len(hand.get_playable_cards(played_cards)))
+        self.assertEqual(3, len(hand.get_unplayed_cards(played_cards)))
 
     def test_hand_score(self):
         hand = Crib.Hand([cc(11, HEARTS), cc(10, CLUBS), cc(12, HEARTS), cc(11, CLUBS)], True)
@@ -263,6 +263,13 @@ class CribTest(unittest.TestCase):
         print('\n', hs)
         self.assertEqual(5, hs.points_value)
 
+    def test_mess_about_with_suits(self):
+        card = cc(3, CLUBS)
+        # for s in Crib.SUITS:
+        print('\n')
+        dict_suits = {globals()[gk]: gk.lower() for gk in globals().keys() if globals()[gk] in Crib.SUITS}
+        print(dict_suits)
+        # print(globals())
 
 if __name__ == '__main__':
     unittest.main()

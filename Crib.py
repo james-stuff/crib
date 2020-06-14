@@ -105,9 +105,6 @@ class Table:
         self.card_var.set(20)
         self.gui.destroy()
 
-    def show_error(self, *args):
-        raise RuntimeError('TkInter issue')
-
 
 class CardButton:
     def __init__(self, table, frame, index, col_start):
@@ -476,7 +473,7 @@ class Round:
     def check_if_knock_required(self):
         if not self.can_go():
             if self.is_players_turn and not self.player_knock:
-                if self.my_hand.get_playable_cards(self.played_cards):
+                if self.my_hand.get_unplayed_cards(self.played_cards):
                     self.interface.wait_for_ctrl_btn_click('Knock')
                 self.player_knock = True
             else:
@@ -488,13 +485,13 @@ class Round:
         turn_dict = {True: self.my_hand, False: self.comp_hand}
         whose_hand = turn_dict[self.is_players_turn]
         return any(self.card_is_small_enough(c) for c in
-                   whose_hand.get_playable_cards(self.played_cards))
+                   whose_hand.get_unplayed_cards(self.played_cards))
 
     def card_is_small_enough(self, card):
         return self.running_total + card.value <= 31
 
     def player_picks_card_in_test_mode(self):
-        for card in self.my_hand.get_playable_cards(self.played_cards):
+        for card in self.my_hand.get_unplayed_cards(self.played_cards):
             if self.card_is_small_enough(card):
                 selected_card = card
                 break
@@ -806,7 +803,7 @@ class Pack():
 
 
 class Card():
-    picdic = {1: 'A', 11: 'J', 12: 'Q', 13: 'K'}
+    picdic = {1: 'A', 11: 'J', 12: 'Q', 13: 'K', 14: 'A'}
 
     def __init__(self, rank, suit):
         self.rank = rank
@@ -889,7 +886,7 @@ class Hand:
         hand_or_box = box_or_hand_dict[self.is_box]
         return 'Show ' + owner + ' ' + hand_or_box
 
-    def get_playable_cards(self, played_already):
+    def get_unplayed_cards(self, played_already):
         return [c for c in self.cards if c not in played_already]
 
     def __str__(self):
