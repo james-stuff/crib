@@ -173,13 +173,11 @@ class Round:
     def __init__(self, players, game=None, cards=None, comp_cards=None):
         self.game = game
         self.players = players
-        self.my_cards = cards
-        self.comp_cards = comp_cards
         self.box_cards = []
         self.played_cards = []
         self.running_total = 0
         self.of_a_kind_count = 1
-        self.is_players_turn = self.comp_knock = self.player_knock = False
+        self.is_players_turn = False
         self.last_score_comment = ''
         self.the_pack = Pack()
         self.face_up_card = None
@@ -192,9 +190,7 @@ class Round:
             self.interface = RoundVisualInterface(self.game.table)
         else:
             self.interface = RoundTestInterface()
-        for p in self.players:
-            p.round = self
-        [p.set_interface(self.interface) for p in self.players]
+        [p.set_interface(self) for p in self.players]
 
     def play_round(self):
         self.deal()
@@ -203,8 +199,6 @@ class Round:
         self.is_players_turn = not self.player_has_box
         self.interface.set_box_buttons(self.player_has_box)
         self.build_box()
-        self.my_hand = Hand(self.my_cards, True)
-        self.comp_hand = Hand(self.comp_cards, False)
         self.box = Hand(self.box_cards, self.player_has_box)
         self.turn_up_top_card()
         self.pegging_round()
@@ -213,14 +207,7 @@ class Round:
         return self
 
     def deal(self):
-        if self.my_cards is None:
-            self.my_cards = self.the_pack.deal(5)
-        if self.comp_cards is None:
-            self.comp_cards = self.the_pack.deal(5)
-        # [p.receive_cards(self.the_pack.deal(5)) for p in self.players]
-        self.players[0].receive_cards(self.my_cards)
-        self.players[1].receive_cards(self.comp_cards)
-        # self.interface.allocate_cards_after_deal(self.my_cards, self.comp_cards)
+        [p.receive_cards(self.the_pack.deal(5)) for p in self.players]
         [self.interface.allocate_cards_after_deal(p) for p in self.players]
 
     def build_box(self):
@@ -241,46 +228,35 @@ class Round:
             self.interface.update_score_info(heels_notification)
 
     def pegging_round(self):
+        next_player = 0
+        if self.player_has_box:
+            next_player = 1
         while len(self.played_cards) < 6:
-            self.check_if_knock_required()
-            if self.is_players_turn and not self.player_knock:
-                card_to_play = self.players[0].pick_card_in_pegging()
-            elif not self.is_players_turn and not self.comp_knock:
-                card_to_play = self.players[1].pick_card_in_pegging()
-            else:
+            # ToDO: double knock was required when we'd both run out of playable cards
+            # TODO: and computer doesn't seem to be knocking
+            # TODO: goes into infinite loop on clicking Computer's turn, player has no cards left
+            # . . . (and computer has two)
+            for p in itertools.islice(itertools.cycle(self.players), next_player, next_player + 2):
                 card_to_play = None
+                p.check_if_knock_required()
+                if not p.knocked:
+                    card_to_play = p.pick_card_in_pegging()
+                if type(card_to_play) == Card:
+                    self.play_card(card_to_play)
+                    self.interface.update_played_cards(self.played_cards)
 
-            if type(card_to_play) == Card:
-                self.play_card(card_to_play)
-                self.interface.update_played_cards(self.played_cards)
-            self.is_players_turn = not self.is_players_turn
-
-            # when to reset to zero:
-            if self.running_total == 31:
-                self.reset_variables_at_31()
-            elif len(self.played_cards) == 6:
-                self.award_go_point()
-            elif self.comp_knock and self.player_knock:
-                self.award_go_point()
-                self.reset_variables_at_31()
-                self.is_players_turn = not self.played_cards[-1] in self.my_cards
-
-    def check_if_knock_required(self):
-        if not self.can_go():
-            if self.is_players_turn and not self.player_knock:
-                if self.my_hand.get_unplayed_cards(self.played_cards):
-                    self.interface.wait_for_ctrl_btn_click('Knock')
-                self.player_knock = True
-            else:
-                self.comp_knock = True
-                self.interface.update_score_info(self.last_score_comment +
-                                                 '\tComputer knocks.')
-
-    def can_go(self):
-        turn_dict = {True: self.my_hand, False: self.comp_hand}
-        whose_hand = turn_dict[self.is_players_turn]
-        return any(self.card_is_small_enough(c) for c in
-                   whose_hand.get_unplayed_cards(self.played_cards))
+                # when to reset to zero:
+                if self.running_total == 31:
+                    self.reset_variables_at_31()
+                elif len(self.played_cards) == 6:
+                    self.award_go_point()
+                elif [p.knocked for p in self.players] == [True] * len(self.players):
+                    self.award_go_point()
+                    self.reset_variables_at_31()
+                    next_player = self.players.index([p for p in self.players if
+                                                      self.played_cards[-1] in p.hand.cards][0]) + 1
+        for p in self.players:
+            p.knocked = False
 
     def card_is_small_enough(self, card):
         return self.running_total + card.value <= 31
@@ -380,12 +356,13 @@ class Round:
     def reset_variables_at_31(self):
         self.running_total = 0
         self.of_a_kind_count = 0
-        self.comp_knock = self.player_knock = False
+        for p in self.players:
+            p.knocked = False
         self.interface.turn_over_played_cards_on_next_turn = True
         self.last_score_comment = ''
 
     def put_cards_on_table(self):
-        hands = [self.my_hand, self.comp_hand]
+        hands = [p.hand for p in self.players]
         display_order = [0, 1]
         if self.player_has_box:
             display_order = display_order[::-1]
@@ -604,19 +581,19 @@ class Player:
         self.initial_card_list = []
         self.card_buttons = self.box_buttons = None
 
-    def set_interface(self, interface):
-        self.interface = interface
+    def set_interface(self, round):
+        self.round = round
+        self.interface = round.interface
 
     def receive_cards(self, card_list):
         self.initial_card_list = card_list
 
     def take_box_turn(self):
-        self.hand = Hand(self.initial_card_list, True)
+        self.hand = Hand(self.initial_card_list, type(self) == HumanPlayer)
 
     def check_if_knock_required(self):
         if not self.can_go():
-            if self.hand.get_unplayed_cards(self.round.played_cards):
-                self.knocked = True
+            self.knocked = True
 
     def can_go(self):
         return any(self.round.card_is_small_enough(c) for c in
@@ -632,10 +609,10 @@ class ComputerPlayer(Player):
         super(ComputerPlayer, self).__init__(current_round)
         self.name = 'Computer'
 
-    def set_interface(self, interface):
-        super(ComputerPlayer, self).set_interface(interface)
-        self.card_buttons = interface.table.comp_card_buttons
-        self.box_buttons = interface.table.comp_box_buttons
+    def set_interface(self, round):
+        super(ComputerPlayer, self).set_interface(round)
+        self.card_buttons = self.interface.table.comp_card_buttons
+        self.box_buttons = self.interface.table.comp_box_buttons
 
     def take_box_turn(self):
         self.interface.wait_for_ctrl_btn_click('Add cards to box for computer')
@@ -651,7 +628,9 @@ class ComputerPlayer(Player):
 
     def check_if_knock_required(self):
         super(ComputerPlayer, self).check_if_knock_required()
-        self.interface.update_score_info(self.round.last_score_comment + '\tComputer knocks.')
+        if self.knocked:# and self.hand.get_unplayed_cards(self.round.played_cards):
+            self.interface.update_score_info(self.round.last_score_comment + '\t' +
+                                             self.name + ' knocks.')
 
     def pick_card_in_pegging(self):
         self.interface.wait_for_ctrl_btn_click(self.name + '\'s turn')
@@ -731,7 +710,7 @@ class ComputerPlayer(Player):
 
     def card_to_play(self):
         cards_down = self.round.played_cards
-        available_cards = [c for c in self.round.comp_cards if
+        available_cards = [c for c in self.hand.cards if
                            c not in cards_down and self.round.card_is_small_enough(c)]
         if len(available_cards) == 1:
             return available_cards[0]
@@ -757,10 +736,10 @@ class HumanPlayer(Player):
         super(HumanPlayer, self).__init__(round)
         self.name = 'Player'
 
-    def set_interface(self, interface):
-        super(HumanPlayer, self).set_interface(interface)
-        self.card_buttons = interface.table.player_card_buttons
-        self.box_buttons = interface.table.player_box_buttons
+    def set_interface(self, round):
+        super(HumanPlayer, self).set_interface(round)
+        self.card_buttons = self.interface.table.player_card_buttons
+        self.box_buttons = self.interface.table.player_box_buttons
 
     def take_box_turn(self):
         box_string = ''
@@ -776,8 +755,14 @@ class HumanPlayer(Player):
         super(HumanPlayer, self).take_box_turn()
 
     def check_if_knock_required(self):
+        if not self.can_go() and not self.knocked:
+            if self.hand.get_unplayed_cards(self.round.played_cards):
+                self.interface.wait_for_ctrl_btn_click('Knock')
+            self.knocked = True
+
         super(HumanPlayer, self).check_if_knock_required()
-        self.interface.wait_for_ctrl_btn_click('Knock')
+        if self.knocked and self.hand.get_unplayed_cards(self.round.played_cards):
+            self.interface.wait_for_ctrl_btn_click('Knock')
 
     def pick_card_in_pegging(self):
         return self.interface.player_picks_card(self.round)
