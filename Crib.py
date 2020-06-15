@@ -231,30 +231,29 @@ class Round:
         next_player = 0
         if self.player_has_box:
             next_player = 1
-        while len(self.played_cards) < 6:
             # ToDO: double knock was required when we'd both run out of playable cards
             # TODO: and computer doesn't seem to be knocking
             # TODO: goes into infinite loop on clicking Computer's turn, player has no cards left
             # . . . (and computer has two)
-            for p in itertools.islice(itertools.cycle(self.players), next_player, next_player + 2):
-                card_to_play = None
-                p.check_if_knock_required()
-                if not p.knocked:
-                    card_to_play = p.pick_card_in_pegging()
-                if type(card_to_play) == Card:
-                    self.play_card(card_to_play)
-                    self.interface.update_played_cards(self.played_cards)
+        for p in itertools.islice(itertools.cycle(self.players), next_player, None):
+            card_to_play = None
+            p.check_if_knock_required()
+            if not p.knocked:
+                card_to_play = p.pick_card_in_pegging()
+            if type(card_to_play) == Card:
+                self.play_card(p, card_to_play)
+                self.interface.update_played_cards(self.played_cards)
 
-                # when to reset to zero:
-                if self.running_total == 31:
-                    self.reset_variables_at_31()
-                elif len(self.played_cards) == 6:
-                    self.award_go_point()
-                elif [p.knocked for p in self.players] == [True] * len(self.players):
-                    self.award_go_point()
-                    self.reset_variables_at_31()
-                    next_player = self.players.index([p for p in self.players if
-                                                      self.played_cards[-1] in p.hand.cards][0]) + 1
+            # when to reset to zero:
+            if self.running_total == 31:
+                self.reset_variables_at_31()
+            elif len(self.played_cards) == 6:
+                self.award_go_point(p)
+            elif [p.knocked for p in self.players] == [True] * len(self.players):
+                self.award_go_point(p)
+                self.reset_variables_at_31()
+            if len(self.played_cards) == 6:
+                break
         for p in self.players:
             p.knocked = False
 
@@ -268,13 +267,14 @@ class Round:
                 break
         return selected_card
 
-    def play_card(self, card_played):
+    def play_card(self, player, card_played):
         ''' see if this card gets any points and show new scores when a valid card is played'''
         for_text = ''
         run_tot_text = str(self.running_total)
         self.update_round_state_with_played_card(card_played)
         turn_score = self.points_scored_by_played_card()
-        total_score = self.interface.update_pegs(self.is_players_turn, turn_score)
+        # total_score = self.interface.update_pegs(self.is_players_turn, turn_score)
+        total_score = self.interface.update_pegs(player == self.players[0], turn_score)
 
         if self.running_total == 31:
             for_text = self.congratulations_on_getting_31()
@@ -284,7 +284,7 @@ class Round:
         win_str = ''
         if turn_score > 0:
             for_text += ' for ' + str(turn_score)
-            win_str = self.check_for_win(self.is_players_turn, total_score)
+            win_str = self.check_for_win(player == self.players[0], total_score)
 
         score_string = run_tot_text + for_text + win_str
         self.last_score_comment = score_string
@@ -323,8 +323,9 @@ class Round:
             congrats = ', ' + dict_31[self.played_cards[-1].value] + '!'
         return congrats
 
-    def award_go_point(self):
-        player_gets_go_point = self.played_cards[-1] in self.my_cards
+    def award_go_point(self, player):
+        # player_gets_go_point = self.played_cards[-1] in self.my_cards
+        player_gets_go_point = not self.players.index(player)
         just_won = 'WON' in self.last_score_comment
         last_score = 0
         if 'for' in self.last_score_comment:
@@ -755,14 +756,10 @@ class HumanPlayer(Player):
         super(HumanPlayer, self).take_box_turn()
 
     def check_if_knock_required(self):
-        if not self.can_go() and not self.knocked:
+        if not self.knocked and not self.can_go():
             if self.hand.get_unplayed_cards(self.round.played_cards):
                 self.interface.wait_for_ctrl_btn_click('Knock')
             self.knocked = True
-
-        super(HumanPlayer, self).check_if_knock_required()
-        if self.knocked and self.hand.get_unplayed_cards(self.round.played_cards):
-            self.interface.wait_for_ctrl_btn_click('Knock')
 
     def pick_card_in_pegging(self):
         return self.interface.player_picks_card(self.round)
