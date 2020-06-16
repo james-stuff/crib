@@ -202,8 +202,8 @@ class Round:
                                                             bo_index + 1, bo_index + 3)]
         # TODO: can I get rid of self.ordered_players and just re-order self.players each round?
         self.build_box()
-        # TODO: remove the second argument to Hand()?
-        self.box = Hand(self.box_cards, self.box_owner == self.players[0])
+        # TODO: inherit a Box class from Hand?
+        self.box = Hand(self.box_cards, self.box_owner)
         self.turn_up_top_card()
         self.pegging_round()
         self.put_cards_on_table()
@@ -264,7 +264,6 @@ class Round:
 
     def play_card(self, player, card_played):
         ''' see if this card gets any points and show new scores when a valid card is played'''
-        # TODO: refactor peg rows
         for_text = ''
         run_tot_text = str(self.running_total)
         self.update_round_state_with_played_card(card_played)
@@ -356,19 +355,18 @@ class Round:
         self.last_score_comment = ''
 
     def put_cards_on_table(self):
-        self.evaluate_hand(self.ordered_players[0].hand, self.ordered_players[0])
+        self.evaluate_hand(self.ordered_players[0].hand)
         self.interface.show_cards_in_list(self.ordered_players[1].hand.cards, visible=False)
-        self.evaluate_hand(self.ordered_players[1].hand, self.ordered_players[1])
-        self.evaluate_hand(self.box, self.ordered_players[1])
+        self.evaluate_hand(self.ordered_players[1].hand)
+        self.evaluate_hand(self.box)
 
-    def evaluate_hand(self, hand_to_score, owner):
-        # TODO: ugly way of calling method.  Can I change it?
+    def evaluate_hand(self, hand_to_score):
         hs = HandScore(hand_to_score, self.face_up_card)
         str_info = str(hs)
         str_info = self.interface.hand_display(hand_to_score) + str_info
 
-        new_score = self.interface.update_pegs(owner, hs.points_value)
-        str_info += self.check_for_win(owner, new_score)
+        new_score = self.interface.update_pegs(hand_to_score.owner, hs.points_value)
+        str_info += self.check_for_win(hand_to_score.owner, new_score)
         self.interface.update_score_info(str_info)
 
 
@@ -578,7 +576,7 @@ class Player:
         self.initial_card_list = card_list
 
     def take_box_turn(self):
-        self.hand = Hand(self.initial_card_list, type(self) == HumanPlayer)
+        self.hand = Hand(self.initial_card_list, self)
 
     def check_if_knock_required(self):
         if not self.can_go():
@@ -592,12 +590,12 @@ class Player:
         pass
 
 
-
 class ComputerPlayer(Player):
     def __init__(self, current_round):
         super(ComputerPlayer, self).__init__(current_round)
         self.name = 'Computer'
-        self.ownership_string = 'Computer has'
+        self.ownership_string = self.name + ' has'
+        self.possessive = self.name.lower() + '\'s'
 
     def set_interface(self, round):
         super(ComputerPlayer, self).set_interface(round)
@@ -612,13 +610,12 @@ class ComputerPlayer(Player):
             self.round.box_cards.append(disc)
             self.interface.transfer_card_to_box(self, disc)
             self.interface.update_score_info('Computer adds ' + str(disc) + ' to box')
-        self.hand = Hand(self.initial_card_list, False)
         self.interface.update_score_info('')
         super(ComputerPlayer, self).take_box_turn()
 
     def check_if_knock_required(self):
         super(ComputerPlayer, self).check_if_knock_required()
-        if self.knocked:# and self.hand.get_unplayed_cards(self.round.played_cards):
+        if self.knocked:
             self.interface.update_score_info(self.round.last_score_comment + '\t' +
                                              self.name + ' knocks.')
 
@@ -635,7 +632,7 @@ class ComputerPlayer(Player):
         all_pairs = find_all_possible_pairs_in(dealt_hand)
         for pair in all_pairs:
             triplet = [c for c in dealt_hand if c not in pair]
-            all_triplets_scored.append([triplet, HandScore(Hand(triplet, False)).points_value])
+            all_triplets_scored.append([triplet, HandScore(Hand(triplet, self)).points_value])
 
         self.refine_box_selection(all_triplets_scored)
         all_triplets_scored.sort(key=lambda tr: tr[1], reverse=True)
@@ -726,6 +723,7 @@ class HumanPlayer(Player):
         super(HumanPlayer, self).__init__(round)
         self.name = 'Player'
         self.ownership_string = 'You have'
+        self.possessive = 'my'
 
     def set_interface(self, round):
         super(HumanPlayer, self).set_interface(round)
@@ -915,18 +913,16 @@ def pluralise_if_necessary(word, count):
 
 
 class Hand:
-    def __init__(self, cards, belongs_to_player):
+    def __init__(self, cards, owner):
         self.cards = cards
-        self.belongs_to_player = belongs_to_player
+        self.owner = owner
         self.is_box = len(cards) == 4
         self.display_button_text = self.set_display_button_text()
 
     def set_display_button_text(self):
-        owner_dict = {True: 'my', False: 'computer\'s'}
         box_or_hand_dict = {True: 'box', False: 'hand'}
-        owner = owner_dict[self.belongs_to_player]
         hand_or_box = box_or_hand_dict[self.is_box]
-        return 'Show ' + owner + ' ' + hand_or_box
+        return 'Show ' + self.owner.possessive + ' ' + hand_or_box
 
     def get_unplayed_cards(self, played_already):
         return [c for c in self.cards if c not in played_already]
