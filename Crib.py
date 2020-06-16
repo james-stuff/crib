@@ -177,16 +177,15 @@ class Round:
         self.played_cards = []
         self.running_total = 0
         self.of_a_kind_count = 1
-        self.is_players_turn = False
         self.last_score_comment = ''
         self.the_pack = Pack()
         self.face_up_card = None
         self.computer = ComputerPlayer(self)
-        self.who_has_it = {True: 'You have', False: 'Computer has'}
         self.my_hand = self.comp_hand = self.box = None
 
         if self.game:
             self.player_has_box = self.game.player_has_box
+            self.box_owner = self.players[not self.game.player_has_box]
             self.interface = RoundVisualInterface(self.game.table)
         else:
             self.interface = RoundTestInterface()
@@ -196,10 +195,10 @@ class Round:
         self.deal()
         if self.game is None:
             self.player_has_box = random.choice([True, False])
-        self.is_players_turn = not self.player_has_box
-        self.interface.set_box_buttons(self.player_has_box)
+        self.interface.set_box_buttons(self.box_owner)
         self.build_box()
-        self.box = Hand(self.box_cards, self.player_has_box)
+        # TODO: remove the second argument to Hand()?
+        self.box = Hand(self.box_cards, self.box_owner == self.players[0])
         self.turn_up_top_card()
         self.pegging_round()
         self.put_cards_on_table()
@@ -211,7 +210,7 @@ class Round:
         [self.interface.allocate_cards_after_deal(p) for p in self.players]
 
     def build_box(self):
-        self.interface.update_score_info(self.who_has_it[self.player_has_box] + ' the box')
+        self.interface.update_score_info(self.box_owner.ownership_string + ' the box')
         turn_order = 1
         if self.player_has_box:
             turn_order = -1
@@ -223,18 +222,14 @@ class Round:
         self.interface.turn_up_top_card(self.face_up_card)
         if self.face_up_card.rank == 11:
             heels_notification = 'Two for his heels!'
-            updated_score = self.interface.update_pegs(self.player_has_box, 2)
-            heels_notification += self.check_for_win(self.player_has_box, updated_score)
+            updated_score = self.interface.update_pegs(self.box_owner == self.players[0], 2)
+            heels_notification += self.check_for_win(self.box_owner, updated_score)
             self.interface.update_score_info(heels_notification)
 
     def pegging_round(self):
-        next_player = 0
-        if self.player_has_box:
-            next_player = 1
-            # ToDO: double knock was required when we'd both run out of playable cards
-            # TODO: and computer doesn't seem to be knocking
-            # TODO: goes into infinite loop on clicking Computer's turn, player has no cards left
-            # . . . (and computer has two)
+        next_player = self.players.index(self.box_owner) + 1
+            # TODO: does the computer always knock?  Think it doesn't when I play the 'go' card
+            # . . .  but maybe it always did this?
         for p in itertools.islice(itertools.cycle(self.players), next_player, None):
             card_to_play = None
             p.check_if_knock_required()
@@ -269,11 +264,11 @@ class Round:
 
     def play_card(self, player, card_played):
         ''' see if this card gets any points and show new scores when a valid card is played'''
+        # TODO: refactor peg rows
         for_text = ''
         run_tot_text = str(self.running_total)
         self.update_round_state_with_played_card(card_played)
         turn_score = self.points_scored_by_played_card()
-        # total_score = self.interface.update_pegs(self.is_players_turn, turn_score)
         total_score = self.interface.update_pegs(player == self.players[0], turn_score)
 
         if self.running_total == 31:
@@ -284,11 +279,11 @@ class Round:
         win_str = ''
         if turn_score > 0:
             for_text += ' for ' + str(turn_score)
-            win_str = self.check_for_win(player == self.players[0], total_score)
+            win_str = self.check_for_win(player, total_score)
 
         score_string = run_tot_text + for_text + win_str
         self.last_score_comment = score_string
-        self.interface.update_score_info(self.interface.log_card_played(self.is_players_turn,
+        self.interface.update_score_info(self.interface.log_card_played(player,
                                                                         card_played, score_string))
 
     def update_round_state_with_played_card(self, card_played):
@@ -324,7 +319,6 @@ class Round:
         return congrats
 
     def award_go_point(self, player):
-        # player_gets_go_point = self.played_cards[-1] in self.my_cards
         player_gets_go_point = not self.players.index(player)
         just_won = 'WON' in self.last_score_comment
         last_score = 0
@@ -342,7 +336,7 @@ class Round:
         if just_won:
             score_string += ' ' + self.last_score_comment[start_of_for + 6:]
         else:
-            score_string += self.check_for_win(player_gets_go_point, updated_score)
+            score_string += self.check_for_win(player, updated_score)
 
         self.interface.update_score_info(score_string)
 
@@ -351,7 +345,7 @@ class Round:
         if self.game is not None:
             if score >= WIN_SCORE and not self.game.win_detected:
                 self.game.win_detected = True
-                congrats = ' -- ' + self.who_has_it[player_just_scored].upper() + ' WON!!!'
+                congrats = ' -- ' + player_just_scored.ownership_string.upper() + ' WON!!!'
         return congrats
 
     def reset_variables_at_31(self):
@@ -365,7 +359,7 @@ class Round:
     def put_cards_on_table(self):
         hands = [p.hand for p in self.players]
         display_order = [0, 1]
-        if self.player_has_box:
+        if self.box_owner == self.players[0]:
             display_order = display_order[::-1]
         self.evaluate_hand(hands[display_order[0]])
         self.interface.show_cards_in_list(hands[display_order[1]].cards, visible=False)
@@ -378,7 +372,7 @@ class Round:
         str_info = self.interface.hand_display(hand_to_score) + str_info
 
         new_score = self.interface.update_pegs(hand_to_score.belongs_to_player, hs.points_value)
-        str_info += self.check_for_win(hand_to_score.belongs_to_player, new_score)
+        str_info += self.check_for_win(self.players[not hand_to_score.belongs_to_player], new_score)
         self.interface.update_score_info(str_info)
 
 
@@ -457,10 +451,8 @@ class RoundTestInterface(RoundInterface):
     def player_picks_card(self, pegging_round):
         return pegging_round.player_picks_card_in_test_mode()
 
-    def log_card_played(self, players_turn, card, score_string):
-        dict_who = {True: 'Player  ', False: 'Computer'}
-        player = dict_who[players_turn]
-        return player + ' : ' + str(card) + '\t' + score_string
+    def log_card_played(self, player, card, score_string):
+        return player.name + ' : ' + str(card) + '\t' + score_string
 
     def hand_display(self, hand):
         return str(hand)
@@ -521,9 +513,9 @@ class RoundVisualInterface(RoundInterface):
             if is_human:
                 card_button.make_clickable()
 
-    def set_box_buttons(self, player_has_box):
+    def set_box_buttons(self, player):
         self.active_box_buttons = self.table.comp_box_buttons
-        if player_has_box:
+        if type(player) == HumanPlayer:
             self.active_box_buttons = self.table.player_box_buttons
 
     def transfer_card_to_box(self, origin_player, card):
@@ -609,6 +601,7 @@ class ComputerPlayer(Player):
     def __init__(self, current_round):
         super(ComputerPlayer, self).__init__(current_round)
         self.name = 'Computer'
+        self.ownership_string = 'Computer has'
 
     def set_interface(self, round):
         super(ComputerPlayer, self).set_interface(round)
@@ -736,6 +729,7 @@ class HumanPlayer(Player):
     def __init__(self, round):
         super(HumanPlayer, self).__init__(round)
         self.name = 'Player'
+        self.ownership_string = 'You have'
 
     def set_interface(self, round):
         super(HumanPlayer, self).set_interface(round)
