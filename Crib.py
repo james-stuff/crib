@@ -180,8 +180,8 @@ class Round:
         self.last_score_comment = ''
         self.the_pack = Pack()
         self.face_up_card = None
-        self.computer = ComputerPlayer(self)
-        self.my_hand = self.comp_hand = self.box = None
+        self.my_hand = self.box = None
+        self.ordered_players = []
 
         if self.game:
             self.player_has_box = self.game.player_has_box
@@ -196,6 +196,10 @@ class Round:
         if self.game is None:
             self.player_has_box = random.choice([True, False])
         self.interface.set_box_buttons(self.box_owner)
+        bo_index = self.players.index(self.box_owner)
+        self.ordered_players = [p for p in itertools.islice(itertools.cycle(self.players),
+                                                            bo_index + 1, bo_index + 3)]
+        # TODO: can I get rid of self.ordered_players and just re-order self.players each round?
         self.build_box()
         # TODO: remove the second argument to Hand()?
         self.box = Hand(self.box_cards, self.box_owner == self.players[0])
@@ -211,13 +215,9 @@ class Round:
 
     def build_box(self):
         self.interface.update_score_info(self.box_owner.ownership_string + ' the box')
-        turn_order = 1
-        if self.player_has_box:
-            turn_order = -1
-        [p.take_box_turn() for p in self.players[::turn_order]]
+        [p.take_box_turn() for p in self.ordered_players]
 
     def turn_up_top_card(self):
-        # Turn up the next card, Two for his heels check:
         self.face_up_card = self.the_pack.deal(1)[0]
         self.interface.turn_up_top_card(self.face_up_card)
         if self.face_up_card.rank == 11:
@@ -227,10 +227,9 @@ class Round:
             self.interface.update_score_info(heels_notification)
 
     def pegging_round(self):
-        next_player = self.players.index(self.box_owner) + 1
             # TODO: does the computer always knock?  Think it doesn't when I play the 'go' card
             # . . .  but maybe it always did this?
-        for p in itertools.islice(itertools.cycle(self.players), next_player, None):
+        for p in itertools.cycle(self.ordered_players):
             card_to_play = None
             p.check_if_knock_required()
             if not p.knocked:
@@ -357,13 +356,9 @@ class Round:
         self.last_score_comment = ''
 
     def put_cards_on_table(self):
-        hands = [p.hand for p in self.players]
-        display_order = [0, 1]
-        if self.box_owner == self.players[0]:
-            display_order = display_order[::-1]
-        self.evaluate_hand(hands[display_order[0]])
-        self.interface.show_cards_in_list(hands[display_order[1]].cards, visible=False)
-        self.evaluate_hand(hands[display_order[1]])
+        self.evaluate_hand(self.ordered_players[0].hand)
+        self.interface.show_cards_in_list(self.ordered_players[1].hand.cards, visible=False)
+        self.evaluate_hand(self.ordered_players[1].hand)
         self.evaluate_hand(self.box)
 
     def evaluate_hand(self, hand_to_score):
