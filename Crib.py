@@ -62,7 +62,7 @@ class Table:
         self.score_info = tkinter.StringVar()
         self.l_score = tkinter.Label(info_frame, font=('Helvetica', 12),
                                      textvariable=self.score_info)
-        self.peg_board = PegBoard(tkinter.Label(info_frame), tkinter.Label(info_frame))
+        self.peg_board = PegBoard([tkinter.Label(info_frame), tkinter.Label(info_frame)])
 
         self.player_card_buttons = [CardButton(self, self.player_cards_frame, n, 1) for n in range(5)]
         self.face_up_card_buttons = [CardButton(self, self.common_card_frame, 0, 4)]
@@ -153,6 +153,7 @@ class Game:
         self.table = table
         self.win_detected = self.is_players_turn = False
         self.players = [HumanPlayer(None), ComputerPlayer(None)]
+        self.table.peg_board.set_players(self.players)
         self.player_has_box = random.choice([True, False])
 
     def play(self):
@@ -222,13 +223,13 @@ class Round:
         self.interface.turn_up_top_card(self.face_up_card)
         if self.face_up_card.rank == 11:
             heels_notification = 'Two for his heels!'
-            updated_score = self.interface.update_pegs(self.box_owner == self.players[0], 2)
+            updated_score = self.interface.update_pegs(self.box_owner, 2)
             heels_notification += self.check_for_win(self.box_owner, updated_score)
             self.interface.update_score_info(heels_notification)
 
     def pegging_round(self):
-            # TODO: does the computer always knock?  Think it doesn't when I play the 'go' card
-            # . . .  but maybe it always did this?
+            # TODO: does the computer always knock?  It doesn't when I play the 'go' card
+            # . . .  This is unchanged, but is it desirable?
         for p in itertools.cycle(self.ordered_players):
             card_to_play = None
             p.check_if_knock_required()
@@ -268,7 +269,7 @@ class Round:
         run_tot_text = str(self.running_total)
         self.update_round_state_with_played_card(card_played)
         turn_score = self.points_scored_by_played_card()
-        total_score = self.interface.update_pegs(player == self.players[0], turn_score)
+        total_score = self.interface.update_pegs(player, turn_score)
 
         if self.running_total == 31:
             for_text = self.congratulations_on_getting_31()
@@ -318,7 +319,6 @@ class Round:
         return congrats
 
     def award_go_point(self, player):
-        player_gets_go_point = not self.players.index(player)
         just_won = 'WON' in self.last_score_comment
         last_score = 0
         if 'for' in self.last_score_comment:
@@ -327,9 +327,9 @@ class Round:
             last_score += 1
             score_string = self.last_score_comment[:start_of_for + 6].rstrip() + ' and a go is ' + str(
                 last_score)
-            updated_score = self.interface.update_pegs(player_gets_go_point, 1, False)
+            updated_score = self.interface.update_pegs(player, 1, False)
         else:
-            updated_score = self.interface.update_pegs(player_gets_go_point, 1)
+            updated_score = self.interface.update_pegs(player, 1)
             score_string = str(self.running_total) + ' for 1'
 
         if just_won:
@@ -356,18 +356,19 @@ class Round:
         self.last_score_comment = ''
 
     def put_cards_on_table(self):
-        self.evaluate_hand(self.ordered_players[0].hand)
+        self.evaluate_hand(self.ordered_players[0].hand, self.ordered_players[0])
         self.interface.show_cards_in_list(self.ordered_players[1].hand.cards, visible=False)
-        self.evaluate_hand(self.ordered_players[1].hand)
-        self.evaluate_hand(self.box)
+        self.evaluate_hand(self.ordered_players[1].hand, self.ordered_players[1])
+        self.evaluate_hand(self.box, self.ordered_players[1])
 
-    def evaluate_hand(self, hand_to_score):
+    def evaluate_hand(self, hand_to_score, owner):
+        # TODO: ugly way of calling method.  Can I change it?
         hs = HandScore(hand_to_score, self.face_up_card)
         str_info = str(hs)
         str_info = self.interface.hand_display(hand_to_score) + str_info
 
-        new_score = self.interface.update_pegs(hand_to_score.belongs_to_player, hs.points_value)
-        str_info += self.check_for_win(self.players[not hand_to_score.belongs_to_player], new_score)
+        new_score = self.interface.update_pegs(owner, hs.points_value)
+        str_info += self.check_for_win(owner, new_score)
         self.interface.update_score_info(str_info)
 
 
@@ -755,21 +756,20 @@ class HumanPlayer(Player):
 
 
 class PegBoard():
+    def __init__(self, screen_labels):
+        self.peg_rows = [PegRow(sl) for sl in screen_labels]
+        [sl.grid(row=index) for index, sl in enumerate(screen_labels)]
+        self.players = None
 
-    def __init__(self, my_pegs, comp_pegs):
-        self.comp_pegs = PegRow(comp_pegs)
-        comp_pegs.configure(fg='blue')
-        comp_pegs.grid(row=0)
-        self.my_pegs = PegRow(my_pegs)
-        my_pegs.grid(row=1)
+    def set_players(self, players):
+        self.players = players[::-1]
 
-    def increment_row_by(self, is_player, point_incr, back_peg_moves=True):
-        pegs_dict = {True: self.my_pegs, False: self.comp_pegs}
-        return pegs_dict[is_player].increment_by(point_incr, back_peg_moves)
+    def increment_row_by(self, player, point_incr, back_peg_moves=True):
+        pr_index = self.players.index(player)
+        return self.peg_rows[pr_index].increment_by(point_incr, back_peg_moves)
 
     def reset(self):
-        self.my_pegs.reset()
-        self.comp_pegs.reset()
+        [pr.reset() for pr in self.peg_rows]
 
 
 class PegRow():
