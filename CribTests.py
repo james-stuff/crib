@@ -170,25 +170,26 @@ class CribTest(unittest.TestCase):
         self.assertEqual(0, score.points_value)
         print('\n', score)
         
-     # NB for these tests, both players put last two cards in list in box, 
-    # then player plays 2, 1, 0 and computer 0, 1, 2 in their remaining card lists
     def testBoxCreation(self):
-        player = [cc(6, CLUBS), cc(5, DIAMONDS), 
-                cc(5, HEARTS), cc(5, SPADES), cc(5, CLUBS)]
-        comp = [cc(11, CLUBS), cc(10, DIAMONDS), 
-                cc(12, HEARTS), cc(13, SPADES), cc(11, CLUBS)]
-        crib_round = Crib.Round(game=None, cards=player, comp_cards=comp)
+        p_cards = [cc(6, CLUBS), cc(5, DIAMONDS), cc(5, HEARTS), cc(5, SPADES), cc(5, CLUBS)]
+        c_cards = [cc(11, CLUBS), cc(10, DIAMONDS), cc(12, HEARTS), cc(13, SPADES), cc(11, CLUBS)]
+        player, computer = Crib.ComputerPlayer('P'), Crib.ComputerPlayer('C')
+        crib_round = Crib.Round([player, computer], game=None)
         crib_round.interface.update_score_info('=== testBoxCreation ===')
+        player.receive_cards(p_cards)
+        computer.receive_cards(c_cards)
         crib_round.play_round()
         print('=' * 23)
         
     def testDozenInPairsPegging(self):
-        player = [cc(2, CLUBS), cc(2, DIAMONDS), 
-                cc(10, HEARTS), cc(5, SPADES), cc(5, CLUBS)]
-        comp = [cc(12, CLUBS), cc(2, SPADES), 
-                cc(2, HEARTS), cc(7, SPADES), cc(11, CLUBS)]
-        crib_round = Crib.Round(game=None, cards=player, comp_cards=comp)
+        player = Crib.ComputerPlayer(name='Dummy player')
+        computer = Crib.ComputerPlayer()
+        player_hand = [cc(2, CLUBS), cc(2, DIAMONDS), cc(5, SPADES), cc(1, HEARTS), cc(6, CLUBS)]
+        comp_hand = [cc(12, CLUBS), cc(2, SPADES), cc(2, HEARTS), cc(1, CLUBS), cc(9, DIAMONDS)]
+        crib_round = Crib.Round([player, computer], game=None)
         crib_round.interface.update_score_info('=== testDozenInPairsPegging ===')
+        player.receive_cards(player_hand)
+        computer.receive_cards(comp_hand)
         crib_round.play_round()
         print('=' * 23)
         

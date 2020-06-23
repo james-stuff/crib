@@ -171,7 +171,7 @@ class Game:
 
 
 class Round:
-    def __init__(self, players, game=None, cards=None, comp_cards=None):
+    def __init__(self, players, game=None):
         self.game = game
         self.players = players
         self.box_cards = []
@@ -189,9 +189,9 @@ class Round:
         else:
             self.interface = RoundTestInterface()
         [p.set_interface(self) for p in self.players]
+        self.deal()
 
     def play_round(self):
-        self.deal()
         if self.game is None:
             self.player_has_box = random.choice([True, False])
         self.box_owner = self.players[not self.player_has_box]
