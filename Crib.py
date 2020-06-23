@@ -152,7 +152,7 @@ class Game:
     def __init__(self, table):
         self.table = table
         self.win_detected = self.is_players_turn = False
-        self.players = [HumanPlayer(None), ComputerPlayer(None)]
+        self.players = [HumanPlayer(), ComputerPlayer()]
         self.table.peg_board.set_players(self.players)
         self.player_has_box = random.choice([True, False])
 
@@ -180,13 +180,11 @@ class Round:
         self.of_a_kind_count = 1
         self.last_score_comment = ''
         self.the_pack = Pack()
-        self.face_up_card = None
-        self.my_hand = self.box = None
+        self.box = self.box_owner = self.face_up_card = None
         self.ordered_players = []
 
-        if self.game:
+        if any([p for p in players if type(p) is HumanPlayer]):
             self.player_has_box = self.game.player_has_box
-            self.box_owner = self.players[not self.game.player_has_box]
             self.interface = RoundVisualInterface(self.game.table)
         else:
             self.interface = RoundTestInterface()
@@ -196,13 +194,13 @@ class Round:
         self.deal()
         if self.game is None:
             self.player_has_box = random.choice([True, False])
+        self.box_owner = self.players[not self.player_has_box]
         self.interface.set_box_buttons(self.box_owner)
         bo_index = self.players.index(self.box_owner)
         self.ordered_players = list(itertools.islice(itertools.cycle(self.players),
                                                      bo_index + 1, bo_index + 3))
         # TODO: can I get rid of self.ordered_players and just re-order self.players each round?
         self.build_box()
-        # TODO: inherit a Box class from Hand?
         self.box = Box(self.box_cards, self.box_owner)
         self.turn_up_top_card()
         self.pegging_round()
@@ -254,13 +252,6 @@ class Round:
 
     def card_is_small_enough(self, card):
         return self.running_total + card.value <= 31
-
-    def player_picks_card_in_test_mode(self):
-        for card in self.my_hand.get_unplayed_cards(self.played_cards):
-            if self.card_is_small_enough(card):
-                selected_card = card
-                break
-        return selected_card
 
     def play_card(self, player, card_played):
         ''' see if this card gets any points and show new scores when a valid card is played'''
@@ -442,9 +433,6 @@ class RoundTestInterface(RoundInterface):
     def turn_up_top_card(self, top_card):
         self.update_score_info('Card turned up: ' + str(top_card))
 
-    def player_picks_card(self, pegging_round):
-        return pegging_round.player_picks_card_in_test_mode()
-
     def log_card_played(self, player, card, score_string):
         return player.name + ' : ' + str(card) + '\t' + score_string
 
@@ -560,11 +548,11 @@ class RoundVisualInterface(RoundInterface):
 
 
 class Player:
-    def __init__(self, current_round):
+    def __init__(self, name=None):
         self.interface = None
         self.hand = None
         self.knocked = False
-        self.round = current_round
+        self.round = None
         self.initial_card_list = []
         self.card_buttons = self.box_buttons = None
 
@@ -591,9 +579,11 @@ class Player:
 
 
 class ComputerPlayer(Player):
-    def __init__(self, current_round):
-        super(ComputerPlayer, self).__init__(current_round)
+    def __init__(self, name=None):
+        super(ComputerPlayer, self).__init__()
         self.name = 'Computer'
+        if name:
+            self.name = name
         self.ownership_string = self.name + ' has'
         self.possessive = self.name.lower() + '\'s'
 
@@ -610,7 +600,7 @@ class ComputerPlayer(Player):
             self.initial_card_list.remove(disc)
             self.round.box_cards.append(disc)
             self.interface.transfer_card_to_box(self, disc)
-            self.interface.update_score_info('Computer adds ' + str(disc) + ' to box')
+            self.interface.update_score_info(self.name + ' adds ' + str(disc) + ' to box')
         self.interface.update_score_info('')
         super(ComputerPlayer, self).take_box_turn()
 
@@ -720,8 +710,8 @@ class ComputerPlayer(Player):
 
 
 class HumanPlayer(Player):
-    def __init__(self, round):
-        super(HumanPlayer, self).__init__(round)
+    def __init__(self, name=None):
+        super(HumanPlayer, self).__init__()
         self.name = 'Player'
         self.ownership_string = 'You have'
         self.possessive = 'my'
@@ -921,7 +911,6 @@ class Hand:
         self.display_button_text = self.set_display_button_text()
 
     def set_display_button_text(self):
-        # TODO: why is this called 11 times when building box???
         return 'Show ' + self.owner.possessive + ' ' + type(self).__name__.lower()
 
     def get_unplayed_cards(self, played_already):

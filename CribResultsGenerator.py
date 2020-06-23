@@ -34,11 +34,11 @@ with open(our_file, 'r', encoding='utf-8') as raw_file:
             scores = [round_no] + 6 * [0]
             hands_counted = 0
         elif 'the box' in line:
-            player_has_box = 'You have' in line
+            player_has_box = 'Comp 1 has' in line
         elif line[:8] == 'Computer' and ':' in line:
             players_turn = False
             scores_index = COMPUTER_PEGGING
-        elif line[:6] == 'Player':
+        elif line[:8] == 'Comp 1 :':
             players_turn = True
             scores_index = PLAYER_PEGGING
             
