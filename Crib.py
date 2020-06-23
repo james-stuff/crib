@@ -198,12 +198,12 @@ class Round:
             self.player_has_box = random.choice([True, False])
         self.interface.set_box_buttons(self.box_owner)
         bo_index = self.players.index(self.box_owner)
-        self.ordered_players = [p for p in itertools.islice(itertools.cycle(self.players),
-                                                            bo_index + 1, bo_index + 3)]
+        self.ordered_players = list(itertools.islice(itertools.cycle(self.players),
+                                                     bo_index + 1, bo_index + 3))
         # TODO: can I get rid of self.ordered_players and just re-order self.players each round?
         self.build_box()
         # TODO: inherit a Box class from Hand?
-        self.box = Hand(self.box_cards, self.box_owner)
+        self.box = Box(self.box_cards, self.box_owner)
         self.turn_up_top_card()
         self.pegging_round()
         self.put_cards_on_table()
@@ -543,7 +543,7 @@ class RoundVisualInterface(RoundInterface):
     def hand_display(self, hand):
         self.wait_for_ctrl_btn_click(hand.display_button_text)
         self.show_cards_in_list(hand.cards)
-        if hand.is_box:
+        if type(hand) is Box:
             self.clear_buttons_in(self.table.player_card_buttons + self.table.comp_card_buttons)
         else:
             self.clear_buttons_in(self.table.played_cards_buttons)
@@ -599,8 +599,9 @@ class ComputerPlayer(Player):
 
     def set_interface(self, round):
         super(ComputerPlayer, self).set_interface(round)
-        self.card_buttons = self.interface.table.comp_card_buttons
-        self.box_buttons = self.interface.table.comp_box_buttons
+        if type(self.interface) is RoundVisualInterface:
+            self.card_buttons = self.interface.table.comp_card_buttons
+            self.box_buttons = self.interface.table.comp_box_buttons
 
     def take_box_turn(self):
         self.interface.wait_for_ctrl_btn_click('Add cards to box for computer')
@@ -727,8 +728,9 @@ class HumanPlayer(Player):
 
     def set_interface(self, round):
         super(HumanPlayer, self).set_interface(round)
-        self.card_buttons = self.interface.table.player_card_buttons
-        self.box_buttons = self.interface.table.player_box_buttons
+        if type(self.interface) is RoundVisualInterface:
+            self.card_buttons = self.interface.table.player_card_buttons
+            self.box_buttons = self.interface.table.player_box_buttons
 
     def take_box_turn(self):
         box_string = ''
@@ -907,7 +909,7 @@ def runs_in_pegging(cards_played):
 
 
 def pluralise_if_necessary(word, count):
-    if count > 1:
+    if count != 1:
         return word + 's'
     return word
 
@@ -916,19 +918,22 @@ class Hand:
     def __init__(self, cards, owner):
         self.cards = cards
         self.owner = owner
-        self.is_box = len(cards) == 4
         self.display_button_text = self.set_display_button_text()
 
     def set_display_button_text(self):
-        box_or_hand_dict = {True: 'box', False: 'hand'}
-        hand_or_box = box_or_hand_dict[self.is_box]
-        return 'Show ' + self.owner.possessive + ' ' + hand_or_box
+        # TODO: why is this called 11 times when building box???
+        return 'Show ' + self.owner.possessive + ' ' + type(self).__name__.lower()
 
     def get_unplayed_cards(self, played_already):
         return [c for c in self.cards if c not in played_already]
 
     def __str__(self):
         return str([str(c) for c in self.cards])
+
+
+class Box(Hand):
+    def __init__(self, cards, owner):
+        super(Box, self).__init__(cards, owner)
 
 
 class HandScore:
