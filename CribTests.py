@@ -277,5 +277,82 @@ class CribTest(unittest.TestCase):
         box = Crib.Box([cc(1, SPADES)], player)
         print(box.set_display_button_text())
 
+    def test_box_cards_easy(self):
+        computer = Crib.ComputerPlayer()
+        round = Crib.Round([computer, Crib.ComputerPlayer()])
+        expected_discards = [cc(1, HEARTS), cc(4, HEARTS)]
+        init_cards = [cc(10, CLUBS), cc(11, CLUBS), cc(5, CLUBS)] + expected_discards
+        computer.receive_cards(init_cards)
+        round.play_round()
+        for d in expected_discards:
+            self.assertNotIn(d, computer.hand.cards)
+
+    def test_box_cards_flush(self):
+        computer = Crib.ComputerPlayer()
+        round = Crib.Round([computer, Crib.ComputerPlayer()])
+        expected_discards = [cc(11, HEARTS), cc(9, HEARTS)]
+        init_cards = [cc(10, CLUBS), cc(11, CLUBS), cc(9, CLUBS)] + expected_discards
+        computer.receive_cards(init_cards)
+        round.play_round()
+        for d in expected_discards:
+            self.assertNotIn(d, computer.hand.cards)
+
+    def test_box_cards_favour_strong_run_potential(self):
+        computer = Crib.ComputerPlayer()
+        round = Crib.Round([computer, Crib.ComputerPlayer()])
+        keep_cards = [cc(10, CLUBS), cc(11, CLUBS)]
+        init_cards = [cc(6, DIAMONDS), cc(1, HEARTS), cc(2, SPADES)] + keep_cards
+        computer.receive_cards(init_cards)
+        round.play_round()
+        for c in keep_cards:
+            self.assertIn(c, computer.hand.cards)
+
+    def test_box_cards_favour_fifteen_potential(self):
+        computer = Crib.ComputerPlayer()
+        round = Crib.Round([computer, Crib.ComputerPlayer()])
+        keep_cards = [cc(1, CLUBS), cc(4, CLUBS)]
+        init_cards = [cc(5, DIAMONDS), cc(7, HEARTS), cc(2, SPADES)] + keep_cards
+        computer.receive_cards(init_cards)
+        round.play_round()
+        for c in keep_cards:
+            self.assertIn(c, computer.hand.cards)
+
+    def test_box_cards_keep_jack_if_no_box(self):
+        computer = Crib.ComputerPlayer()
+        round = Crib.Round([computer, Crib.ComputerPlayer()])
+        round.player_has_box = True # TEST FAILS IF FALSE
+        keep_card = cc(11, CLUBS)
+        init_cards = [keep_card] + [cc(6, DIAMONDS), cc(1, HEARTS), cc(3, SPADES), cc(7, CLUBS)]
+        computer.receive_cards(init_cards)
+        computer.take_box_turn()
+        print(computer.hand)
+        self.assertIn(keep_card, computer.hand.cards)
+
+    def test_box_cards_two_jacks_and_a_fifteen_no_box(self):
+        computer = Crib.ComputerPlayer()
+        round = Crib.Round([computer, Crib.ComputerPlayer()])
+        round.player_has_box = True
+        keep_cards = [cc(11, CLUBS), cc(11, DIAMONDS)]
+        init_cards = keep_cards + [cc(1, HEARTS), cc(7, SPADES), cc(8, CLUBS)]
+        computer.receive_cards(init_cards)
+        computer.take_box_turn()
+        print(computer.hand)
+        for c in keep_cards:
+            self.assertIn(c, computer.hand.cards)
+
+    def test_box_cards_two_jacks_and_a_fifteen_computer_has_box(self):
+        # result is sensitive to changing card order
+        computer = Crib.ComputerPlayer()
+        round = Crib.Round([computer, Crib.ComputerPlayer()])
+        round.player_has_box = False
+        discards = [cc(11, CLUBS), cc(11, DIAMONDS)]
+        init_cards = [cc(1, HEARTS), cc(7, SPADES), cc(8, CLUBS)] + discards
+        computer.receive_cards(init_cards)
+        computer.take_box_turn()
+        print(computer.hand)
+        for c in discards:
+            self.assertNotIn(c, computer.hand.cards)
+
+
 if __name__ == '__main__':
     unittest.main()

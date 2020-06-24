@@ -17,7 +17,7 @@ WIN_SCORE = 121
 NUMBERS = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven',
            'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen',
            'fourteen', 'fifteen', 'sixteen']
-VERSION = '2.1.7'
+VERSION = '2.1.8'
 
 
 class Table:
@@ -617,72 +617,45 @@ class ComputerPlayer(Player):
         return selected_card
 
     def two_cards_for_box(self, dealt_hand):
-        final_selection = []
-        all_triplets_scored = []
-
-        all_pairs = find_all_possible_pairs_in(dealt_hand)
-        for pair in all_pairs:
-            triplet = [c for c in dealt_hand if c not in pair]
-            all_triplets_scored.append([triplet, HandScore(Hand(triplet, self)).points_value])
-
+        triplets = find_all_combos(dealt_hand, 3)
+        all_triplets_scored = [[t, HandScore(Hand(t, self)).points_value] for t in triplets]
         self.refine_box_selection(all_triplets_scored)
-        all_triplets_scored.sort(key=lambda tr: tr[1], reverse=True)
+        desired_triplet = max(all_triplets_scored, key=lambda tr: tr[1])[0]
+        return [c for c in dealt_hand if c not in desired_triplet]
 
-        #        print('All triplets, scored:')
-        #        for tr in all_triplets_scored:
-        #            print([str(c) for c in tr[0]], str(tr[1]))
-
-        # discard the two cards that are not in the highest-scoring triplet:
-        desired_triplet = all_triplets_scored[0][0]
-        final_selection = [c for c in dealt_hand if c not in desired_triplet]
-        return final_selection
-
-    def refine_box_selection(self, all_trios):
-        for sel in all_trios:
-            sel[1] += self.evaluate_run_potential(sel[0])
-            sel[1] += self.evaluate_flush_extension_potential(sel[0])
-            sel[1] += self.evaluate_fifteen_potential(sel[0])
-            sel[1] += self.evaluate_knob_potential(sel[0])
+    def refine_box_selection(self, all_tr_scored):
+        for tr in all_tr_scored:
+            tr[1] += sum([getattr(self, m)(tr[0]) for m in self.__dir__() if 'evaluate' in m])
 
     def evaluate_run_potential(self, triplet):
         strong_run_potential = weak_run_potential = 0
-        pairs = find_all_possible_pairs_in(triplet)
+        pairs = find_all_combos(triplet)
         for pr in pairs:
-            if pr[0].rank + pr[1].rank == 3 or pr[0].rank + pr[1].rank == 25:
+            rank_sum = pr[0].rank + pr[1].rank
+            rank_diff = abs(pr[0].rank - pr[1].rank)
+            if rank_sum in [3, 25] or rank_diff == 2:#    A2 / QK or cards two apart
                 weak_run_potential += 3 * 1 / 13
-            #                print('Weak run potential for A2 or QK')
-            elif abs(pr[0].rank - pr[1].rank) == 2:
-                weak_run_potential += 3 * 1 / 13
-            #                print('Weak run potential for two cards 2 apart')
-            elif abs(pr[0].rank - pr[1].rank) == 1:
+            elif rank_diff == 1:
                 strong_run_potential += 3 * 2 / 13
-        #                print('Strong run potential')
         return strong_run_potential + weak_run_potential
 
     def evaluate_flush_extension_potential(self, triplet):
-        suits_found = set([t.suit for t in triplet])
+        suits_found = set([c.suit for c in triplet])
         if len(suits_found) == 1:
-            #            self.round.update_score_info('flush extension potential: ' + str([str(t) for t in triplet]))
             return 10 / 47
         return 0
 
     def evaluate_fifteen_potential(self, triplet):
-        additional_likely_points = len([t for t in triplet if t.value == 5])
-        pairs = find_all_possible_pairs_in(triplet)
-        additional_likely_points += len([pr for pr in pairs if pr[0].value + pr[1].value == 5])
-        #        if additional_likely_points > 0:
-        #            self.round.update_score_info(str([str(t) for t in triplet]) + 
-        #                                          ' Extra fifteen potential x' + 
-        #                                          str(additional_likely_points))
-        return additional_likely_points * 2 * 4 / 13
+        fives = len([c for c in triplet if c.value == 5])
+        pairs = find_all_combos(triplet)
+        fives += len([pr for pr in pairs if sum([c.value for c in pr]) == 5])
+        return fives * 2 * 4 / 13
 
     def evaluate_knob_potential(self, triplet):
         # I am double-rating the score instead of just adding to the score for hands that have the J
         # and taking away from hands that don't.  Only care about RELATIVE value of hands.  Is this right??
         if self.round.player_has_box:
             knob_potential = len([t for t in triplet if t.rank == 11]) * 2 * 12 / 51
-            #            self.round.update_score_info('Knob potential: ' + str([str(t) for t in triplet]) + 
-            #                                         str(knob_potential))
             return knob_potential
         return 0
 
@@ -705,7 +678,6 @@ class ComputerPlayer(Player):
                 score = -1
             card_scores.append([c, score])
         card_scores.sort(key=lambda i: i[1])
-        #        print('card_scores:', [str(cs[0]) + ' ' + str(cs[1]) for cs in card_scores])
         return card_scores[-1][0]
 
 
@@ -850,17 +822,8 @@ class Card():
         return str(self.value) + self.suit
 
 
-def find_all_possible_pairs_in(hand):
-    return list(itertools.combinations(hand, 2))
-
-
-def pair_counter(list_of_pairs, matching_test, value=0):
-    expr = lambda pr: matching_test(pr, value)
-    return len([i for i in filter(expr, list_of_pairs)])
-
-
-def is_pair(two_cards, unused_value=0):
-    return two_cards[0].rank == two_cards[1].rank
+def find_all_combos(hand, length=2):
+    return list(itertools.combinations(hand, length))
 
 
 def its_a_run(card_list):
@@ -990,7 +953,7 @@ class HandScore:
         return
 
     def count_pairs(self):
-        ct = pair_counter(find_all_possible_pairs_in(self.all_cards), is_pair)
+        ct = len([pr for pr in find_all_combos(self.all_cards) if pr[0].rank == pr[1].rank])
         self.points_value += ct * 2
         if ct:
             self.two_pairs = ct == 2
