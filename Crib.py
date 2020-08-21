@@ -827,36 +827,25 @@ def find_all_combos(hand, length=2):
 
 def its_a_run(card_list):
     no_of_cards = len(card_list)
-    ranks = [c.rank for c in card_list]
-    if max(ranks) == min(ranks) + no_of_cards - 1:
-        if len(set(ranks)) == no_of_cards:
-            return True
+    if no_of_cards >= 3:
+        ranks = [c.rank for c in card_list]
+        if max(ranks) == min(ranks) + no_of_cards - 1:
+            if len(set(ranks)) == no_of_cards:
+                return True
     return False
 
 
 def runs_in_pegging(cards_played):
-    cumulative = 0
-    no_of_cards = len(cards_played)
-
-    if no_of_cards >= 3:
-        # check if 31 was reached, and if so, ignore the cards that got there:
-        for i, c in enumerate(cards_played):
-            cumulative += c.value
-            if cumulative == 31 and not len(cards_played) == i + 1:
-                # if 31 was reached, use cards starting after the card that
-                # got the total to 31 - unless it's the last card played
-                cards_played = cards_played[i + 1:]
-                break
-            elif cumulative > 31:
-                cards_played = cards_played[i:]
-                break
-
-    no_of_cards = len(cards_played)
-    if no_of_cards >= 3:
-        for starting_point in range(no_of_cards - 2):
-            sequence = cards_played[starting_point:]
-            if its_a_run(sequence):
-                return len(sequence)
+    if len(cards_played) >= 3:
+        valid_cards = cards_played
+        if sum([c.value for c in cards_played]) > 31:
+            if sum([c.value for c in cards_played[:4]]) <= 31:
+                return 0
+            else:
+                valid_cards = cards_played[3:]
+        for n_start_card in range(len(valid_cards)):
+            if its_a_run(valid_cards[n_start_card:]):
+                return len(valid_cards[n_start_card:])
     return 0
 
 

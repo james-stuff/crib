@@ -353,6 +353,24 @@ class CribTest(unittest.TestCase):
         for c in discards:
             self.assertNotIn(c, computer.hand.cards)
 
+    def test_most_complex_run_in_pegging(self):
+        cards_down = [cc(7, CLUBS), cc(5, CLUBS), cc(4, SPADES), cc(2, DIAMONDS), cc(6, HEARTS),
+                      cc(3, CLUBS)]
+        self.assertEqual(6, Crib.runs_in_pegging(cards_down))
+
+    def test_broken_run_in_pegging(self):
+        cards_down = [cc(2, CLUBS), cc(10, DIAMONDS), cc(11, SPADES), cc(12, HEARTS)]
+        self.assertEqual(0, Crib.runs_in_pegging(cards_down))
+
+    def test_second_phase_run_in_pegging(self):
+        cards_down = [cc(10, DIAMONDS), cc(13, SPADES), cc(9, HEARTS), cc(8, CLUBS), cc(6, HEARTS),
+                      cc(7, SPADES)]
+        self.assertEqual(3, Crib.runs_in_pegging(cards_down))
+
+    def test_previous_run_in_pegging(self):
+        cards_down = [cc(9, SPADES), cc(1, HEARTS), cc(2, CLUBS), cc(3, HEARTS), cc(5, SPADES)]
+        self.assertEqual(0, Crib.runs_in_pegging(cards_down))
+
 
 if __name__ == '__main__':
     unittest.main()
