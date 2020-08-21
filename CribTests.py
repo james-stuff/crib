@@ -371,6 +371,11 @@ class CribTest(unittest.TestCase):
         cards_down = [cc(9, SPADES), cc(1, HEARTS), cc(2, CLUBS), cc(3, HEARTS), cc(5, SPADES)]
         self.assertEqual(0, Crib.runs_in_pegging(cards_down))
 
+    def test_one_card_after_31_not_a_run(self):
+        cards_down = [cc(4, HEARTS), cc(2, CLUBS), cc(7, DIAMONDS), cc(8, SPADES), cc(9, CLUBS),
+                      cc(10, SPADES)]
+        self.assertEqual(0, Crib.runs_in_pegging(cards_down))
+
 
 if __name__ == '__main__':
     unittest.main()

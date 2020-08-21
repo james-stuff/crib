@@ -843,7 +843,7 @@ def runs_in_pegging(cards_played):
                 return 0
             else:
                 valid_cards = cards_played[3:]
-        for n_start_card in range(len(valid_cards)):
+        for n_start_card in range(len(valid_cards) - 2):
             if its_a_run(valid_cards[n_start_card:]):
                 return len(valid_cards[n_start_card:])
     return 0
