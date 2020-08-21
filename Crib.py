@@ -18,7 +18,7 @@ NUMBERS = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven',
            'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen',
            'fourteen', 'fifteen', 'sixteen']
 VERSION = '2.1.8'
-
+# TODO: box score for ComputerPlayer has gone down slightly.  Is this worthy of investigation?
 
 class Table:
     def __init__(self):
@@ -196,9 +196,8 @@ class Round:
             self.player_has_box = random.choice([True, False])
         self.box_owner = self.players[not self.player_has_box]
         self.interface.set_box_buttons(self.box_owner)
-        bo_index = self.players.index(self.box_owner)
-        self.ordered_players = list(itertools.islice(itertools.cycle(self.players),
-                                                     bo_index + 1, bo_index + 3))
+        lead_index = (self.players.index(self.box_owner) + 1) % len(self.players)
+        self.ordered_players = self.players[lead_index:] + self.players[:lead_index]
         # TODO: can I get rid of self.ordered_players and just re-order self.players each round?
         self.build_box()
         self.box = Box(self.box_cards, self.box_owner)
@@ -361,7 +360,7 @@ class Round:
         self.interface.update_score_info(str_info)
 
 
-class RoundInterface():
+class RoundInterface:
     def __init__(self):
         self.turn_over_played_cards_on_next_turn = False
         self.active_box_buttons = None
@@ -717,7 +716,7 @@ class HumanPlayer(Player):
         return self.interface.player_picks_card(self.round)
 
 
-class PegBoard():
+class PegBoard:
     def __init__(self, screen_labels):
         self.peg_rows = [PegRow(sl) for sl in screen_labels]
         [sl.grid(row=index) for index, sl in enumerate(screen_labels)]
@@ -734,7 +733,7 @@ class PegBoard():
         [pr.reset() for pr in self.peg_rows]
 
 
-class PegRow():
+class PegRow:
     empty_peg_row = '¦' + ((WIN_SCORE // 5) * (5 * '.' + '¦'))
     peg = '\u2022'
 
@@ -797,7 +796,7 @@ class PegRow():
         return position
 
 
-class Pack():
+class Pack:
     def __init__(self):
         self.pack = [Card(rank, suit) for rank in range(1, 14) for suit in SUITS]
         random.shuffle(self.pack)
@@ -806,7 +805,7 @@ class Pack():
         return [self.pack.pop() for n in range(how_many_cards)]
 
 
-class Card():
+class Card:
     picdic = {1: 'A', 11: 'J', 12: 'Q', 13: 'K', 14: 'A'}
 
     def __init__(self, rank, suit):
@@ -920,24 +919,16 @@ class HandScore:
         self.points_value += instances * 2
         for f in range(1, instances + 1):
             self.description += NUMBERS[15] + ' ' + NUMBERS[f * 2] + ', '
-        return
 
     def count_runs(self):
-        # get every combination from length of hand downwards
-        # if the whole hand is a run, can stop there
-        instances = length = 0
         for run_length in range(len(self.all_cards), 2, -1):
             combos = itertools.combinations(self.all_cards, run_length)
-            for comb in combos:
-                if its_a_run(comb):
-                    instances += 1
-                    length = run_length
-            if instances:
-                self.points_value += instances * length
-                run_or_runs = pluralise_if_necessary(' run', instances)
-                self.description += NUMBERS[instances] + run_or_runs + ' of ' + NUMBERS[length] + ', '
+            runs = [comb for comb in combos if its_a_run(comb)]
+            if runs:
+                self.points_value += len(runs) * run_length
+                self.description += f'{NUMBERS[len(runs)]} {pluralise_if_necessary("run", len(runs))}' \
+                                    f' of {NUMBERS[run_length]}, '
                 break
-        return
 
     def count_flush(self):
         flush_suit = self.all_cards[0].suit
@@ -950,7 +941,6 @@ class HandScore:
         if points_awarded:
             self.points_value += points_awarded
             self.description += 'a flush of ' + NUMBERS[points_awarded] + ', '
-        return
 
     def count_pairs(self):
         ct = len([pr for pr in find_all_combos(self.all_cards) if pr[0].rank == pr[1].rank])
@@ -958,7 +948,6 @@ class HandScore:
         if ct:
             self.two_pairs = ct == 2
             self.description += NUMBERS[ct] + pluralise_if_necessary(' pair', ct) + ', '
-        return
 
     def count_knob(self):
         if self.face_up_card:
