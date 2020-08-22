@@ -14,9 +14,8 @@ DIAMONDS = '\u2666'
 SPADES = '\u2660'
 SUITS = [HEARTS, CLUBS, DIAMONDS, SPADES]
 WIN_SCORE = 121
-NUMBERS = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven',
-           'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen',
-           'fourteen', 'fifteen', 'sixteen']
+NUMBERS = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+           'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen']
 VERSION = '2.1.8'
 # TODO: box score for ComputerPlayer has gone down slightly.  Is this worthy of investigation?
 
@@ -212,7 +211,7 @@ class Round:
         [self.interface.allocate_cards_after_deal(p) for p in self.players]
 
     def build_box(self):
-        self.interface.update_score_info(self.box_owner.ownership_string + ' the box')
+        self.interface.update_score_info(f'{self.box_owner.ownership_string} the box')
         [p.take_box_turn() for p in self.ordered_players]
 
     def turn_up_top_card(self):
@@ -267,7 +266,7 @@ class Round:
 
         win_str = ''
         if turn_score > 0:
-            for_text += ' for ' + str(turn_score)
+            for_text += f' for {turn_score}'
             win_str = self.check_for_win(player, total_score)
 
         score_string = run_tot_text + for_text + win_str
@@ -304,7 +303,7 @@ class Round:
                    6: 'six is alive', 7: 'sevens galore',
                    8: 'eight\'s a spree', 9: 'nine\'ll do', 10: '31'}
         if self.played_cards[-1].value in dict_31:
-            congrats = ', ' + dict_31[self.played_cards[-1].value] + '!'
+            congrats = f', {dict_31[self.played_cards[-1].value]}!'
         return congrats
 
     def award_go_point(self, player):
@@ -314,15 +313,15 @@ class Round:
             start_of_for = self.last_score_comment.index('for')
             last_score = int(self.last_score_comment[start_of_for + 4:start_of_for + 6])
             last_score += 1
-            score_string = self.last_score_comment[:start_of_for + 6].rstrip() + ' and a go is ' + str(
-                last_score)
+            score_string = f'{self.last_score_comment[:start_of_for + 6].rstrip()} and a go is ' \
+                           f'{last_score}'
             updated_score = self.interface.update_pegs(player, 1, False)
         else:
             updated_score = self.interface.update_pegs(player, 1)
-            score_string = str(self.running_total) + ' for 1'
+            score_string = f'{self.running_total} for 1'
 
         if just_won:
-            score_string += ' ' + self.last_score_comment[start_of_for + 6:]
+            score_string += f' {self.last_score_comment[start_of_for + 6:]}'
         else:
             score_string += self.check_for_win(player, updated_score)
 
@@ -333,7 +332,7 @@ class Round:
         if self.game is not None:
             if score >= WIN_SCORE and not self.game.win_detected:
                 self.game.win_detected = True
-                congrats = ' -- ' + player_just_scored.ownership_string.upper() + ' WON!!!'
+                congrats = f' -- {player_just_scored.ownership_string.upper()} WON!!!'
         return congrats
 
     def reset_variables_at_31(self):
@@ -430,10 +429,10 @@ class RoundTestInterface(RoundInterface):
         return player_cards[-1]
 
     def turn_up_top_card(self, top_card):
-        self.update_score_info('Card turned up: ' + str(top_card))
+        self.update_score_info(f'Card turned up: {top_card}')
 
     def log_card_played(self, player, card, score_string):
-        return player.name + ' : ' + str(card) + '\t' + score_string
+        return f'{player.name} : {card}\t{score_string}'
 
     def hand_display(self, hand):
         return str(hand)
@@ -599,18 +598,17 @@ class ComputerPlayer(Player):
             self.initial_card_list.remove(disc)
             self.round.box_cards.append(disc)
             self.interface.transfer_card_to_box(self, disc)
-            self.interface.update_score_info(self.name + ' adds ' + str(disc) + ' to box')
+            self.interface.update_score_info(f'{self.name} adds {disc} to box')
         self.interface.update_score_info('')
         super(ComputerPlayer, self).take_box_turn()
 
     def check_if_knock_required(self):
         super(ComputerPlayer, self).check_if_knock_required()
         if self.knocked:
-            self.interface.update_score_info(self.round.last_score_comment + '\t' +
-                                             self.name + ' knocks.')
+            self.interface.update_score_info(f'{self.round.last_score_comment}\t{self.name} knocks.')
 
     def pick_card_in_pegging(self):
-        self.interface.wait_for_ctrl_btn_click(self.name + '\'s turn')
+        self.interface.wait_for_ctrl_btn_click(f'{self.name}\'s turn')
         selected_card = self.card_to_play()
         self.interface.hide_played_card(selected_card)
         return selected_card
@@ -702,8 +700,8 @@ class HumanPlayer(Player):
             self.round.box_cards.append(card_for_box)
             box_string += str(card_for_box)
             self.interface.transfer_card_to_box(self, card_for_box)
-            self.interface.update_score_info('Card added to box: ' + box_string)
-        self.interface.update_score_info('Cards added to box: ' + box_string)
+            self.interface.update_score_info(f'Card added to box: {box_string}')
+        self.interface.update_score_info(f'Cards added to box: {box_string}')
         super(HumanPlayer, self).take_box_turn()
 
     def check_if_knock_required(self):
@@ -750,8 +748,7 @@ class PegRow:
         self.draw_for_new_game()
 
     def draw_for_new_game(self):
-        self.full_peg_row = (self.peg + ' ' + self.empty_peg_row +
-                             '  ' + '0'.rjust(4))
+        self.full_peg_row = f'{self.peg} {self.empty_peg_row} {"0".rjust(5)}'
         self.draw()
 
     def draw(self):
@@ -766,7 +763,7 @@ class PegRow:
             self.back_peg = self.front_peg
         self.front_peg += points_to_add
 
-        self.full_peg_row = '  ' + self.empty_peg_row + '  '
+        self.full_peg_row = f'  {self.empty_peg_row}  '
         self.insert_peg_for_score(self.back_peg)
         self.insert_peg_for_score(self.front_peg)
 
@@ -851,7 +848,7 @@ def runs_in_pegging(cards_played):
 
 def pluralise_if_necessary(word, count):
     if count != 1:
-        return word + 's'
+        return f'{word}s'
     return word
 
 
@@ -862,13 +859,13 @@ class Hand:
         self.display_button_text = self.set_display_button_text()
 
     def set_display_button_text(self):
-        return 'Show ' + self.owner.possessive + ' ' + type(self).__name__.lower()
+        return f'Show {self.owner.possessive} {type(self).__name__.lower()}'
 
     def get_unplayed_cards(self, played_already):
         return [c for c in self.cards if c not in played_already]
 
     def __str__(self):
-        return str([str(c) for c in self.cards])
+        return f'{[str(c) for c in self.cards]}'
 
 
 class Box(Hand):
@@ -906,8 +903,8 @@ class HandScore:
                 if sum([card.value for card in list(combo)]) == 15:
                     instances += 1
         self.points_value += instances * 2
-        for f in range(1, instances + 1):
-            self.description += NUMBERS[15] + ' ' + NUMBERS[f * 2] + ', '
+        for fifteen_instance in range(1, instances + 1):
+            self.description += f'{NUMBERS[15]} {NUMBERS[fifteen_instance * 2]}, '
 
     def count_runs(self):
         for run_length in range(len(self.all_cards), 2, -1):
@@ -929,14 +926,14 @@ class HandScore:
             points_awarded = 3
         if points_awarded:
             self.points_value += points_awarded
-            self.description += 'a flush of ' + NUMBERS[points_awarded] + ', '
+            self.description += f'a flush of {NUMBERS[points_awarded]}, '
 
     def count_pairs(self):
         ct = len([pr for pr in find_all_combos(self.all_cards) if pr[0].rank == pr[1].rank])
         self.points_value += ct * 2
         if ct:
             self.two_pairs = ct == 2
-            self.description += NUMBERS[ct] + pluralise_if_necessary(' pair', ct) + ', '
+            self.description += f'{NUMBERS[ct]} {pluralise_if_necessary("pair", ct)}, '
 
     def count_knob(self):
         if self.face_up_card:
@@ -951,9 +948,9 @@ class HandScore:
         last_comma = desc.rfind(',')
         if last_comma > 0:
             if 'Bob' not in desc and desc.split()[-2] != 'fifteen':
-                desc = desc[:last_comma] + ' and' + desc[last_comma + 1:]
+                desc = f'{desc[:last_comma]} and {desc[last_comma + 2:]}'
         desc = desc[0].upper() + desc[1:]
-        return desc + ' is ' + str(self.points_value)
+        return f'{desc} is {self.points_value}'
 
 
 if __name__ == '__main__':
