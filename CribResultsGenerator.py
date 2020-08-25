@@ -7,84 +7,58 @@ Created on Sun Jan 26 11:06:38 2020
 import csv
 import os
 
-PLAYER_PEGGING = 1
-PLAYER_HAND = 2
-PLAYER_BOX = 3
-COMPUTER_PEGGING = 4
-COMPUTER_HAND = 5
-COMPUTER_BOX = 6
 
-possible_files = os.listdir()
-our_file = ''
-for f in possible_files:
-    if 'MonteCarloOutput' in f:
-        our_file = f
-        version_no = f[16:f.index('.txt')]
-        break
+class RoundBuilder:
+    def __init__(self, first_line):
+        self.round_no = int(first_line[-10:-4].lstrip())
+        self.pegging, self.hands, self.boxes = ([0, 0] for n in range(3))
+        self.all_scores, self.parsed_hands = ([] for n in range(2))
+        self.box_owner = ''
+        self.pegging_points_index = 0
+
+    def parse_line(self, line):
+        if 'the box' in line:
+            self.box_owner = line[:line.index(' has')]
+        if line[0] == '[':
+            self.parsed_hands.append(int(line[-3:]))
+            if len(self.parsed_hands) == 3:
+                self.allocate_all_points()
+        if ':' in line:
+            self.pegging_points_index = line[:8] == 'Computer'
+            if 'for' in line:
+                self.pegging[self.pegging_points_index] += int(line[-3:])
+        if 'go' in line or ' for 1\n' in line:
+            self.pegging[self.pegging_points_index] += 1
+
+    def allocate_all_points(self):
+        self.hands = self.parsed_hands[:2]
+        if self.box_owner == 'Comp 1':
+            self.hands = self.hands[::-1]
+        self.boxes[self.box_owner == 'Computer'] = self.parsed_hands[2]
+        self.all_scores = [self.pegging, self.hands, self.boxes]
+
+    def get_totals(self):
+        return [self.round_no] + [a[n] for n in range(2) for a in self.all_scores]
+
+
+our_file = [f for f in os.listdir('.') if 'MonteCarloOutput' in f][0]
+version_no = our_file[16:our_file.index('.txt')]
 
 with open(our_file, 'r', encoding='utf-8') as raw_file:
-    hands_counted = 0
     final_results = []
-    round_no = -1
-    scores = []
     for line in raw_file:
         if 'Monte Carlo round' in line:
-#            print('Scores for round', round_no, ':', scores)
-            round_no = int(line[-10:-4].lstrip())
-            scores = [round_no] + 6 * [0]
-            hands_counted = 0
-        elif 'the box' in line:
-            player_has_box = 'Comp 1 has' in line
-        elif line[:8] == 'Computer' and ':' in line:
-            players_turn = False
-            scores_index = COMPUTER_PEGGING
-        elif line[:8] == 'Comp 1 :':
-            players_turn = True
-            scores_index = PLAYER_PEGGING
-            
-        if len(scores) > 0:
-            if 'for' in line and '[' not in line and '.' not in line and 'go' not in line and '!' not in line[-2:]:
-                pegging_score_increment = int(line[-3:])
-                scores[scores_index] += pegging_score_increment
-            elif 'go' in line:
-                scores[scores_index] += 1
-            elif line[0] == '[':
-                hands_counted += 1
-                if hands_counted == 1:
-                    if player_has_box:
-                        scores_index = COMPUTER_HAND
-                    else:
-                        scores_index = PLAYER_HAND
-                if hands_counted == 2:
-                    if player_has_box:
-                        scores_index = PLAYER_HAND
-                    else:
-                        scores_index = COMPUTER_HAND
-                if hands_counted == 3:
-                    if player_has_box:
-                        scores_index = PLAYER_BOX
-                    else:
-                        scores_index = COMPUTER_BOX
-                hand_score_increment = int(line[-3:])
-                scores[scores_index] = hand_score_increment
-                
-                if hands_counted == 3 and round_no >= 0:
-                    final_results.append(scores)
+            current_round = RoundBuilder(line)
+        else:
+            current_round.parse_line(line)
+            if len(current_round.all_scores) == 3:
+                final_results.append(current_round.get_totals())
+    no_of_rounds = len(final_results)
+    final_results.append(['Ave'] + [sum([pts[ind] for pts in final_results]) / 10000
+                                    for ind in range(1, 7)])
 
 with open('MonteCarloResults' + version_no + '.csv', 'w', newline='') as csv_file:
     csv_file.writelines(',,PLAYER,,,COMPUTER,\n')
-    csv_file.writelines('Round,' + 'Peg, Hand, Box,' * 2 + '\n')
+    csv_file.writelines(f'Round,{"Peg, Hand, Box," * 2}\n')
     csvw = csv.writer(csv_file, quoting=csv.QUOTE_NONNUMERIC)
     csvw.writerows(final_results)
-    
-    # write averages:
-    averages = []
-    for s in range(7):
-        if s == 0:
-            averages.append('Ave')
-        else:
-            tot = 0
-            for res in final_results:
-                tot += res[s]
-            averages.append(tot / (round_no + 1))
-    csvw.writerow(averages)

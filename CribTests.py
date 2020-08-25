@@ -194,7 +194,7 @@ class CribTest(unittest.TestCase):
         print('=' * 23)
         
     def testMonteCarloPeggingRounds(self):
-        for round_id in range(10):
+        for round_id in range(10000):
             next_round = Crib.Round([Crib.ComputerPlayer(name='Comp 1'), Crib.ComputerPlayer()])
             next_round.interface.update_score_info('=== Monte Carlo round ' +
                                                    str(round_id).rjust(6) + '===')
@@ -375,6 +375,20 @@ class CribTest(unittest.TestCase):
         cards_down = [cc(4, HEARTS), cc(2, CLUBS), cc(7, DIAMONDS), cc(8, SPADES), cc(9, CLUBS),
                       cc(10, SPADES)]
         self.assertEqual(0, Crib.runs_in_pegging(cards_down))
+
+    def test_results_generator_matches_reference_file(self):
+        ref_file = open('Test\\MonteCarloResults2.1.8.csv')
+        test_subject = open('MonteCarloResults2.1.8.csv')
+        differences = 0
+        print('\n')
+        for line_no, line in enumerate(test_subject.readlines()):
+            expected_line = ref_file.readline()
+            if line != expected_line:
+                differences += 1
+                print(f'Line {line_no} does not match: \nMy file:\t{line}Expected:\t{expected_line}')
+                if differences > 5:
+                    break
+        self.assertEqual(0, differences)
 
 
 if __name__ == '__main__':
