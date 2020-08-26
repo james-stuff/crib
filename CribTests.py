@@ -105,15 +105,21 @@ class CribTest(unittest.TestCase):
         
     def testRunsInPegging(self):
         played_cards = [cc(2, CLUBS), cc(3, HEARTS), cc(4, DIAMONDS)]
-        self.assertEqual(3, Crib.runs_in_pegging(played_cards))
+        ps = Crib.PeggingSequence()
+        [ps.add_card(c) for c in played_cards]
+        self.assertEqual(3, ps.run_score())
         
     def testComplexRunInPegging(self):
         played_cards = [cc(10, CLUBS), cc(3, HEARTS), cc(5, DIAMONDS), cc(6, CLUBS), cc(4, SPADES)]
-        self.assertEqual(4, Crib.runs_in_pegging(played_cards))
+        ps = Crib.PeggingSequence()
+        [ps.add_card(c) for c in played_cards]
+        self.assertEqual(4, ps.run_score())
         
     def testShouldntBeARun(self):   
         played_cards = [cc(9, DIAMONDS), cc(11, HEARTS), cc(11, DIAMONDS)]
-        self.assertEqual(0, Crib.runs_in_pegging(played_cards))
+        ps = Crib.PeggingSequence()
+        [ps.add_card(c) for c in played_cards]
+        self.assertEqual(0, ps.run_score())
         
     def testTwentyNine(self):
         hand = Crib.Hand([cc(11, CLUBS), cc(5, DIAMONDS), cc(5, HEARTS), cc(5, SPADES)], Crib.HumanPlayer())
@@ -194,7 +200,7 @@ class CribTest(unittest.TestCase):
         print('=' * 23)
         
     def testMonteCarloPeggingRounds(self):
-        for round_id in range(10000):
+        for round_id in range(10):
             next_round = Crib.Round([Crib.ComputerPlayer(name='Comp 1'), Crib.ComputerPlayer()])
             next_round.interface.update_score_info('=== Monte Carlo round ' +
                                                    str(round_id).rjust(6) + '===')
@@ -356,25 +362,35 @@ class CribTest(unittest.TestCase):
     def test_most_complex_run_in_pegging(self):
         cards_down = [cc(7, CLUBS), cc(5, CLUBS), cc(4, SPADES), cc(2, DIAMONDS), cc(6, HEARTS),
                       cc(3, CLUBS)]
-        self.assertEqual(6, Crib.runs_in_pegging(cards_down))
+        ps = Crib.PeggingSequence()
+        [ps.add_card(c) for c in cards_down]
+        self.assertEqual(6, ps.run_score())
 
     def test_broken_run_in_pegging(self):
         cards_down = [cc(2, CLUBS), cc(10, DIAMONDS), cc(11, SPADES), cc(12, HEARTS)]
-        self.assertEqual(0, Crib.runs_in_pegging(cards_down))
+        ps = Crib.PeggingSequence()
+        [ps.add_card(c) for c in cards_down]
+        self.assertEqual(0, ps.run_score())
 
     def test_second_phase_run_in_pegging(self):
         cards_down = [cc(10, DIAMONDS), cc(13, SPADES), cc(9, HEARTS), cc(8, CLUBS), cc(6, HEARTS),
                       cc(7, SPADES)]
-        self.assertEqual(3, Crib.runs_in_pegging(cards_down))
+        ps = Crib.PeggingSequence()
+        [ps.add_card(c) for c in cards_down]
+        self.assertEqual(3, ps.run_score())
 
     def test_previous_run_in_pegging(self):
         cards_down = [cc(9, SPADES), cc(1, HEARTS), cc(2, CLUBS), cc(3, HEARTS), cc(5, SPADES)]
-        self.assertEqual(0, Crib.runs_in_pegging(cards_down))
+        ps = Crib.PeggingSequence()
+        [ps.add_card(c) for c in cards_down]
+        self.assertEqual(0, ps.run_score())
 
     def test_one_card_after_31_not_a_run(self):
         cards_down = [cc(4, HEARTS), cc(2, CLUBS), cc(7, DIAMONDS), cc(8, SPADES), cc(9, CLUBS),
                       cc(10, SPADES)]
-        self.assertEqual(0, Crib.runs_in_pegging(cards_down))
+        ps = Crib.PeggingSequence()
+        [ps.add_card(c) for c in cards_down]
+        self.assertEqual(0, ps.run_score())
 
     def test_results_generator_matches_reference_file(self):
         ref_file = open('Test\\MonteCarloResults2.1.8.csv')
@@ -389,6 +405,32 @@ class CribTest(unittest.TestCase):
                 if differences > 5:
                     break
         self.assertEqual(0, differences)
+
+    def test_pegging_sequence(self):
+        ps = Crib.PeggingSequence()
+        self.assertEqual(0, len(ps))
+
+    def test_adding_cards_to_peg_seq(self):
+        ps = Crib.PeggingSequence()
+        ps.add_card(Crib.Card(5, DIAMONDS))
+        ps.add_card(Crib.Card(13, SPADES))
+        self.assertEqual(15, ps.running_total)
+        self.assertEqual(2, ps.fifteen_or_thirty_one_score())
+
+    def test_pairs_peg_seq(self):
+        ps = Crib.PeggingSequence()
+        ps.add_card(Crib.Card(6, HEARTS))
+        ps.add_card(Crib.Card(6, DIAMONDS))
+        ps.add_card(Crib.Card(6, CLUBS))
+        self.assertEqual(6, ps.pairs_score())
+
+    def test_thirty_one_peg_seq(self):
+        ps = Crib.PeggingSequence()
+        ps.add_card(Crib.Card(11, HEARTS))
+        ps.add_card(Crib.Card(8, DIAMONDS))
+        ps.add_card(Crib.Card(6, CLUBS))
+        ps.add_card(Crib.Card(7, CLUBS))
+        self.assertEqual(2, ps.fifteen_or_thirty_one_score())
 
 
 if __name__ == '__main__':

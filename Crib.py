@@ -16,7 +16,7 @@ SUITS = [HEARTS, CLUBS, DIAMONDS, SPADES]
 WIN_SCORE = 121
 NUMBERS = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
            'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen']
-VERSION = '2.1.8'
+VERSION = '2.1.9'
 # TODO: box score for ComputerPlayer has gone down slightly.  Is this worthy of investigation?
 
 class Table:
@@ -175,6 +175,7 @@ class Round:
         self.players = players
         self.box_cards = []
         self.played_cards = []
+        self.ps = PeggingSequence()
         self.running_total = 0
         self.of_a_kind_count = 1
         self.last_score_comment = ''
@@ -256,7 +257,7 @@ class Round:
         for_text = ''
         run_tot_text = str(self.running_total)
         self.update_round_state_with_played_card(card_played)
-        turn_score = self.points_scored_by_played_card()
+        turn_score = self.ps.get_last_card_points()
         total_score = self.interface.update_pegs(player, turn_score)
 
         if self.running_total == 31:
@@ -275,26 +276,9 @@ class Round:
                                                                         card_played, score_string))
 
     def update_round_state_with_played_card(self, card_played):
+        self.ps.add_card(card_played)
         self.played_cards.append(card_played)
         self.running_total += card_played.value
-
-    def points_scored_by_played_card(self):
-        added_points = 0
-        if self.running_total in [15, 31]:
-            added_points = 2
-        added_points += self.pairs_in_pegging()
-        added_points += runs_in_pegging(self.played_cards)
-        return added_points
-
-    def pairs_in_pegging(self):
-        if len(self.played_cards) > 1:
-            if self.played_cards[-1].rank == self.played_cards[-2].rank:
-                self.of_a_kind_count += 1
-            else:
-                self.of_a_kind_count = 1
-        dict_of_a_kind = {1: 0, 2: 2, 3: 6, 4: 12}
-        points_for_pairs = dict_of_a_kind[self.of_a_kind_count]
-        return points_for_pairs
 
     def congratulations_on_getting_31(self):
         congrats = ''
@@ -357,6 +341,51 @@ class Round:
         new_score = self.interface.update_pegs(hand_to_score.owner, hs.points_value)
         str_info += self.check_for_win(hand_to_score.owner, new_score)
         self.interface.update_score_info(str_info)
+
+
+class PeggingSequence:
+    dict_of_a_kind = {1: 0, 2: 2, 3: 6, 4: 12}
+
+    def __init__(self):
+        self.cards_down = []
+        self.running_total = 0
+        self.cards_of_a_kind = 1
+
+    def __getitem__(self, ind):
+        return self.cards_down[ind]
+
+    def __len__(self):
+        return len(self.cards_down)
+
+    def add_card(self, card):
+        self.cards_down.append(card)
+        self.running_total += card.value
+        if len(self) > 1 and self[-1].rank == self[-2].rank:
+            self.cards_of_a_kind += 1
+        else:
+            self.cards_of_a_kind = 1
+
+    def fifteen_or_thirty_one_score(self):
+        return (self.running_total in [15, 31]) * 2
+
+    def pairs_score(self):
+        return self.dict_of_a_kind[self.cards_of_a_kind]
+
+    def run_score(self):
+        if len(self) >= 3:
+            valid_cards = self.cards_down
+            if sum([c.value for c in self.cards_down]) > 31:
+                if sum([c.value for c in self.cards_down[:4]]) <= 31:
+                    return 0
+                else:
+                    valid_cards = self.cards_down[3:]
+            for n_start_card in range(len(valid_cards) - 2):
+                if its_a_run(valid_cards[n_start_card:]):
+                    return len(valid_cards[n_start_card:])
+        return 0
+
+    def get_last_card_points(self):
+        return sum([getattr(self, m)() for m in self.__dir__() if '_score' in m])
 
 
 class RoundInterface:
