@@ -174,10 +174,7 @@ class Round:
         self.game = game
         self.players = players
         self.box_cards = []
-        self.played_cards = []
         self.ps = PeggingSequence()
-        self.running_total = 0
-        self.of_a_kind_count = 1
         self.last_score_comment = ''
         self.the_pack = Pack()
         self.box = self.box_owner = self.face_up_card = None
@@ -232,38 +229,38 @@ class Round:
             p.check_if_knock_required()
             if not p.knocked:
                 card_to_play = p.pick_card_in_pegging()
-            if type(card_to_play) == Card:
+            if isinstance(card_to_play, Card):
                 self.play_card(p, card_to_play)
-                self.interface.update_played_cards(self.played_cards)
+                self.interface.update_played_cards(self.ps)
 
             # when to reset to zero:
-            if self.running_total == 31:
+            if self.ps.running_total == 31:
                 self.reset_variables_at_31()
-            elif len(self.played_cards) == 6:
+            elif len(self.ps) == 6:
                 self.award_go_point(p)
             elif [p.knocked for p in self.players] == [True] * len(self.players):
                 self.award_go_point(p)
                 self.reset_variables_at_31()
-            if len(self.played_cards) == 6:
+            if len(self.ps) == 6:
                 break
         for p in self.players:
             p.knocked = False
 
     def card_is_small_enough(self, card):
-        return self.running_total + card.value <= 31
+        return self.ps.card_does_not_break_31(card)
 
     def play_card(self, player, card_played):
         ''' see if this card gets any points and show new scores when a valid card is played'''
         for_text = ''
-        run_tot_text = str(self.running_total)
-        self.update_round_state_with_played_card(card_played)
+        run_tot_text = str(self.ps.running_total)
+        self.ps.add_card(card_played)
         turn_score = self.ps.get_last_card_points()
         total_score = self.interface.update_pegs(player, turn_score)
 
-        if self.running_total == 31:
+        if self.ps.running_total == 31:
             for_text = self.congratulations_on_getting_31()
         else:
-            run_tot_text = str(self.running_total)
+            run_tot_text = str(self.ps.running_total)
 
         win_str = ''
         if turn_score > 0:
@@ -275,19 +272,13 @@ class Round:
         self.interface.update_score_info(self.interface.log_card_played(player,
                                                                         card_played, score_string))
 
-    def update_round_state_with_played_card(self, card_played):
-        self.ps.add_card(card_played)
-        self.played_cards.append(card_played)
-        self.running_total += card_played.value
-
     def congratulations_on_getting_31(self):
         congrats = ''
-        dict_31 = {1: 'one-ty', 2: 'two\'s in time', 3: 'three\'s awake',
-                   4: 'four\'s in heaven', 5: 'five\'s a fix',
-                   6: 'six is alive', 7: 'sevens galore',
+        dict_31 = {1: 'one-ty', 2: 'two\'s in time', 3: 'three\'s awake', 4: 'four\'s in heaven',
+                   5: 'five\'s a fix', 6: 'six is alive', 7: 'sevens galore',
                    8: 'eight\'s a spree', 9: 'nine\'ll do', 10: '31'}
-        if self.played_cards[-1].value in dict_31:
-            congrats = f', {dict_31[self.played_cards[-1].value]}!'
+        if self.ps[-1].value in dict_31:
+            congrats = f', {dict_31[self.ps[-1].value]}!'
         return congrats
 
     def award_go_point(self, player):
@@ -302,7 +293,7 @@ class Round:
             updated_score = self.interface.update_pegs(player, 1, False)
         else:
             updated_score = self.interface.update_pegs(player, 1)
-            score_string = f'{self.running_total} for 1'
+            score_string = f'{self.ps.running_total} for 1'
 
         if just_won:
             score_string += f' {self.last_score_comment[start_of_for + 6:]}'
@@ -320,12 +311,11 @@ class Round:
         return congrats
 
     def reset_variables_at_31(self):
-        self.running_total = 0
-        self.of_a_kind_count = 0
         for p in self.players:
             p.knocked = False
         self.interface.turn_over_played_cards_on_next_turn = True
         self.last_score_comment = ''
+        self.ps.reset()
 
     def put_cards_on_table(self):
         self.evaluate_hand(self.ordered_players[0].hand)
@@ -357,9 +347,20 @@ class PeggingSequence:
     def __len__(self):
         return len(self.cards_down)
 
+    def __copy__(self):
+        ps = PeggingSequence()
+        ps.cards_down = self.cards_down
+        return ps
+
+    def card_does_not_break_31(self, card):
+        return self.running_total + card.value <= 31
+
     def add_card(self, card):
         self.cards_down.append(card)
         self.running_total += card.value
+        if self.running_total > 31:
+            self.running_total = card.value
+            self.cards_of_a_kind = 0
         if len(self) > 1 and self[-1].rank == self[-2].rank:
             self.cards_of_a_kind += 1
         else:
@@ -386,6 +387,12 @@ class PeggingSequence:
 
     def get_last_card_points(self):
         return sum([getattr(self, m)() for m in self.__dir__() if '_score' in m])
+
+    def reset(self):
+        self.running_total = self.cards_of_a_kind = 0
+
+    def pop_last_card(self):
+        self.cards_down.pop()
 
 
 class RoundInterface:
@@ -599,7 +606,7 @@ class Player:
 
     def can_go(self):
         return any(self.round.card_is_small_enough(c) for c in
-                   self.hand.get_unplayed_cards(self.round.played_cards))
+                   self.hand.get_unplayed_cards(self.round.ps))
 
     def pick_card_in_pegging(self):
         pass
@@ -686,22 +693,18 @@ class ComputerPlayer(Player):
         return 0
 
     def card_to_play(self):
-        cards_down = self.round.played_cards
+        test_ps = self.round.ps.__copy__()
         available_cards = [c for c in self.hand.cards if
-                           c not in cards_down and self.round.card_is_small_enough(c)]
+                           c not in test_ps and test_ps.card_does_not_break_31(c)]
         if len(available_cards) == 1:
             return available_cards[0]
 
         card_scores = []
-        of_a_kind_scores = {0: 0, 1: 2, 2: 6, 3: 12}
         for c in available_cards:
-            score = 0
-            if len(cards_down) > 0 and c.rank == cards_down[-1].rank:
-                score += of_a_kind_scores[self.round.of_a_kind_count]
-            score += runs_in_pegging(cards_down + [c])
-            score += 2 * (self.round.running_total + c.value in [15, 31])
-            if self.round.running_total == 0 and c.rank == 5:
-                score = -1
+            # TODO: computer lead with a 5.  Does this really work??  (Think it does)
+            test_ps.add_card(c)
+            score = -1 if test_ps.running_total == c.rank == 5 else test_ps.get_last_card_points()
+            test_ps.pop_last_card()
             card_scores.append([c, score])
         card_scores.sort(key=lambda i: i[1])
         return card_scores[-1][0]
@@ -735,7 +738,7 @@ class HumanPlayer(Player):
 
     def check_if_knock_required(self):
         if not self.knocked and not self.can_go():
-            if self.hand.get_unplayed_cards(self.round.played_cards):
+            if self.hand.get_unplayed_cards(self.round.ps):
                 self.interface.wait_for_ctrl_btn_click('Knock')
             self.knocked = True
 
