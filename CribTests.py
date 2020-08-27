@@ -236,16 +236,6 @@ class CribTest(unittest.TestCase):
                           cc(13, HEARTS)], Crib.ComputerPlayer())
         self.assertEqual('Show computer\'s box', hand.display_button_text)
 
-    def test_no_cards_left(self):
-        hand = Crib.Hand([cc(3, HEARTS), cc(6, DIAMONDS), cc(10, CLUBS)], Crib.HumanPlayer())
-        played_cards = [cc(2, HEARTS), cc(1, CLUBS)] + hand.cards
-        self.assertFalse(hand.get_unplayed_cards(played_cards))
-
-    def test_three_cards_left(self):
-        hand = Crib.Hand([cc(3, HEARTS), cc(6, DIAMONDS), cc(10, CLUBS)], Crib.HumanPlayer())
-        played_cards = [cc(2, HEARTS), cc(1, CLUBS)]
-        self.assertEqual(3, len(hand.get_unplayed_cards(played_cards)))
-
     def test_hand_score(self):
         hand = Crib.Hand([cc(11, HEARTS), cc(10, CLUBS), cc(12, HEARTS), cc(11, CLUBS)], Crib.HumanPlayer())
         hs = Crib.HandScore(hand, cc(9, DIAMONDS))
@@ -431,6 +421,14 @@ class CribTest(unittest.TestCase):
         ps.add_card(Crib.Card(6, CLUBS))
         ps.add_card(Crib.Card(7, CLUBS))
         self.assertEqual(2, ps.fifteen_or_thirty_one_score())
+
+    def test_not_a_pair_after_31_peg_seq(self):
+        ps = Crib.PeggingSequence()
+        ps.add_card(Crib.Card(11, HEARTS))
+        ps.add_card(Crib.Card(8, DIAMONDS))
+        ps.add_card(Crib.Card(13, CLUBS))
+        ps.add_card(Crib.Card(13, SPADES))
+        self.assertEqual(0, ps.pairs_score())
 
 
 if __name__ == '__main__':

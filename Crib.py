@@ -226,7 +226,7 @@ class Round:
             # . . .  This is unchanged, but is it desirable?
         for p in itertools.cycle(self.ordered_players):
             card_to_play = None
-            p.check_if_knock_required()
+            p.knock_if_required()
             if not p.knocked:
                 card_to_play = p.pick_card_in_pegging()
             if isinstance(card_to_play, Card):
@@ -474,7 +474,7 @@ class RoundTestInterface(RoundInterface):
         return str(hand)
 
     def end_of_round_tidy_up(self):
-        self.log_file.close() # without this, Monte Carlo logging skips many rounds
+        self.log_file.close()  # without this, Monte Carlo logging skips many rounds
 
 
 class RoundVisualInterface(RoundInterface):
@@ -600,13 +600,15 @@ class Player:
     def take_box_turn(self):
         self.hand = Hand(self.initial_card_list, self)
 
-    def check_if_knock_required(self):
-        if not self.can_go():
+    def knock_if_required(self):
+        if not self.get_playable_cards():
             self.knocked = True
 
-    def can_go(self):
-        return any(self.round.card_is_small_enough(c) for c in
-                   self.hand.get_unplayed_cards(self.round.ps))
+    def get_playable_cards(self):
+        return [c for c in self.get_unplayed_cards() if self.round.card_is_small_enough(c)]
+
+    def get_unplayed_cards(self):
+        return set(self.hand) - set(self.round.ps)
 
     def pick_card_in_pegging(self):
         pass
@@ -638,14 +640,14 @@ class ComputerPlayer(Player):
         self.interface.update_score_info('')
         super(ComputerPlayer, self).take_box_turn()
 
-    def check_if_knock_required(self):
-        super(ComputerPlayer, self).check_if_knock_required()
+    def knock_if_required(self):
+        super(ComputerPlayer, self).knock_if_required()
         if self.knocked:
             self.interface.update_score_info(f'{self.round.last_score_comment}\t{self.name} knocks.')
 
     def pick_card_in_pegging(self):
         self.interface.wait_for_ctrl_btn_click(f'{self.name}\'s turn')
-        selected_card = self.card_to_play()
+        selected_card = self.select_card_to_play()
         self.interface.hide_played_card(selected_card)
         return selected_card
 
@@ -692,16 +694,13 @@ class ComputerPlayer(Player):
             return knob_potential
         return 0
 
-    def card_to_play(self):
+    def select_card_to_play(self):
         test_ps = self.round.ps.__copy__()
-        available_cards = [c for c in self.hand.cards if
-                           c not in test_ps and test_ps.card_does_not_break_31(c)]
+        available_cards = self.get_playable_cards()
         if len(available_cards) == 1:
             return available_cards[0]
-
         card_scores = []
         for c in available_cards:
-            # TODO: computer lead with a 5.  Does this really work??  (Think it does)
             test_ps.add_card(c)
             score = -1 if test_ps.running_total == c.rank == 5 else test_ps.get_last_card_points()
             test_ps.pop_last_card()
@@ -736,9 +735,9 @@ class HumanPlayer(Player):
         self.interface.update_score_info(f'Cards added to box: {box_string}')
         super(HumanPlayer, self).take_box_turn()
 
-    def check_if_knock_required(self):
-        if not self.knocked and not self.can_go():
-            if self.hand.get_unplayed_cards(self.round.ps):
+    def knock_if_required(self):
+        if not self.knocked and not self.get_playable_cards():
+            if self.get_unplayed_cards():
                 self.interface.wait_for_ctrl_btn_click('Knock')
             self.knocked = True
 
@@ -864,20 +863,6 @@ def its_a_run(card_list):
     return False
 
 
-def runs_in_pegging(cards_played):
-    if len(cards_played) >= 3:
-        valid_cards = cards_played
-        if sum([c.value for c in cards_played]) > 31:
-            if sum([c.value for c in cards_played[:4]]) <= 31:
-                return 0
-            else:
-                valid_cards = cards_played[3:]
-        for n_start_card in range(len(valid_cards) - 2):
-            if its_a_run(valid_cards[n_start_card:]):
-                return len(valid_cards[n_start_card:])
-    return 0
-
-
 def pluralise_if_necessary(word, count):
     if count != 1:
         return f'{word}s'
@@ -890,11 +875,14 @@ class Hand:
         self.owner = owner
         self.display_button_text = self.set_display_button_text()
 
+    def __getitem__(self, index):
+        return self.cards[index]
+
+    def __len__(self):
+        return len(self.cards)
+
     def set_display_button_text(self):
         return f'Show {self.owner.possessive} {type(self).__name__.lower()}'
-
-    def get_unplayed_cards(self, played_already):
-        return [c for c in self.cards if c not in played_already]
 
     def __str__(self):
         return f'{[str(c) for c in self.cards]}'
