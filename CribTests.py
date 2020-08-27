@@ -9,6 +9,8 @@ import Crib
 import unittest
 import tkinter
 from Crib import Card as cc
+import os
+import re
 
 HEARTS = '\u2665'
 CLUBS = '\u2663'
@@ -176,7 +178,7 @@ class CribTest(unittest.TestCase):
         self.assertEqual(0, score.points_value)
         print('\n', score)
         
-    def testBoxCreation(self):
+    def test_box_creation(self):
         p_cards = [cc(6, CLUBS), cc(5, DIAMONDS), cc(5, HEARTS), cc(5, SPADES), cc(5, CLUBS)]
         c_cards = [cc(11, CLUBS), cc(10, DIAMONDS), cc(12, HEARTS), cc(13, SPADES), cc(11, CLUBS)]
         player, computer = Crib.ComputerPlayer('P'), Crib.ComputerPlayer('C')
@@ -187,7 +189,7 @@ class CribTest(unittest.TestCase):
         crib_round.play_round()
         print('=' * 23)
         
-    def testDozenInPairsPegging(self):
+    def test_dozen_in_pairs_pegging(self):
         player = Crib.ComputerPlayer(name='Dummy player')
         computer = Crib.ComputerPlayer()
         player_hand = [cc(2, CLUBS), cc(2, DIAMONDS), cc(5, SPADES), cc(1, HEARTS), cc(6, CLUBS)]
@@ -199,13 +201,6 @@ class CribTest(unittest.TestCase):
         crib_round.play_round()
         print('=' * 23)
         
-    def testMonteCarloPeggingRounds(self):
-        for round_id in range(10):
-            next_round = Crib.Round([Crib.ComputerPlayer(name='Comp 1'), Crib.ComputerPlayer()])
-            next_round.interface.update_score_info('=== Monte Carlo round ' +
-                                                   str(round_id).rjust(6) + '===')
-            next_round.play_round()
-            
     def testPegRow01_Init(self):
         pr = Crib.PegRow('not used')
         self.assertEqual(pr.full_peg_row[:9], '\u2022' + ' ¦.....¦')
@@ -429,6 +424,65 @@ class CribTest(unittest.TestCase):
         ps.add_card(Crib.Card(13, CLUBS))
         ps.add_card(Crib.Card(13, SPADES))
         self.assertEqual(0, ps.pairs_score())
+
+    def test_weird_or_missing_pegging_strings(self):
+        def compare_files(two_files):
+            suits_regex = '|'.join(Crib.SUITS)
+            def is_interesting(raw_line):
+                exclude_list = [' box', '[', '===', 'turned up:']
+                for exclude in exclude_list:
+                    if exclude in raw_line:
+                        return False
+                return True
+
+            def get_description_string_from(raw_line):
+                whole_line = raw_line[:-1]
+                if ' : ' in whole_line:
+                    start_ind = re.search(suits_regex, whole_line).start() + 1
+                    return whole_line[start_ind:]
+                return whole_line
+
+            unique_strings_found = []
+            with open(two_files[0], 'r', encoding='utf-8') as of:
+                for line in of.readlines():
+                    if is_interesting(line):
+                        description = get_description_string_from(line)
+                        if description not in unique_strings_found:
+                            unique_strings_found.append(description)
+
+            print(f'\n<<BIG TURN DESCRIPTOR TEST>>')
+            print(f'{len(unique_strings_found)} unique strings found in {two_files[0]}')
+            unique_strings_found.sort()
+            # for us in unique_strings_found:
+            #     print(us)
+
+            missing_strings = []
+            with open(two_files[1], 'r', encoding='utf-8') as ref_file:
+                ref_text = ref_file.read()
+                for us in unique_strings_found:
+                    if not re.search(us, ref_text):
+                        missing_strings.append(us)
+            return missing_strings
+
+        latest_mco_file = [f for f in os.listdir('.') if 'MonteCarloOutput' in f][0]
+        files_to_compare = [latest_mco_file, 'Test\\MonteCarloOutput2.1.8.txt']
+        test_passes = True
+        for step in range(1, -2, -2):
+            missing_from_second_file = compare_files(files_to_compare[::step])
+            if missing_from_second_file:
+                test_passes = False
+            print(f'{len(missing_from_second_file)} missing from {files_to_compare[::step][1]}:')
+            for ms in missing_from_second_file:
+                print(ms)
+
+        self.assertTrue(test_passes)
+
+    def test_monte_carlo_pegging_rounds(self):
+        for round_id in range(10000):
+            next_round = Crib.Round([Crib.ComputerPlayer(name='Comp 1'), Crib.ComputerPlayer()])
+            next_round.interface.update_score_info('=== Monte Carlo round ' +
+                                                   str(round_id).rjust(6) + '===')
+            next_round.play_round()
 
 
 if __name__ == '__main__':
