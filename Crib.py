@@ -13,7 +13,7 @@ CLUBS = '\u2663'
 DIAMONDS = '\u2666'
 SPADES = '\u2660'
 SUITS = [HEARTS, CLUBS, DIAMONDS, SPADES]
-WIN_SCORE = 121
+WIN_SCORE = 11
 NUMBERS = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
            'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen']
 VERSION = '2.1.9'
@@ -61,7 +61,10 @@ class Table:
         self.score_info = tkinter.StringVar()
         self.l_score = tkinter.Label(info_frame, font=('Helvetica', 12),
                                      textvariable=self.score_info)
-        self.peg_board = PegBoard([tkinter.Label(info_frame), tkinter.Label(info_frame)])
+        self.peg_rows = []
+        for n in range(2):
+            self.peg_rows.append(PegRow(tkinter.Label(info_frame)))
+            self.peg_rows[-1].screen_label.grid(row=n)
 
         self.player_card_buttons = [CardButton(self, self.player_cards_frame, n, 1) for n in range(5)]
         self.face_up_card_buttons = [CardButton(self, self.common_card_frame, 0, 4)]
@@ -92,7 +95,8 @@ class Table:
         self.btControl.configure(command=lambda: self.card_var.set(19))
         self.score_info.set('')
         self.l_score.configure(bg='green')
-        self.peg_board.reset()
+        # self.peg_board.reset()
+        [pr.reset() for pr in self.peg_rows]
 
     def await_control_button_click(self, instruction):
         self.card_var.set(-1)
@@ -152,7 +156,9 @@ class Game:
         self.table = table
         self.win_detected = self.is_players_turn = False
         self.players = [HumanPlayer(), ComputerPlayer()]
-        self.table.peg_board.set_players(self.players)
+        for ind, pl in enumerate(self.players[::-1]):
+            pl.pegs = self.table.peg_rows[ind]
+            pl.pegs.game = self
         self.player_has_box = random.choice([True, False])
 
     def play(self):
@@ -168,8 +174,18 @@ class Game:
         self.table.face_up_card_buttons[0].show(face_up=False)
         active_round.interface.clear_box()
 
+    def record_win(self, calling_peg_row):
+        self.win_detected = True
+        player = [p for p in self.players if p.pegs is calling_peg_row][0]
+        self.table.score_info.set(self.table.score_info.get() +
+                                  f' -- {player.ownership_string.upper()} WON!!!')
+
 
 class Round:
+    dict_31 = {1: 'one-ty', 2: 'two\'s in time', 3: 'three\'s awake',
+               4: 'four\'s in heaven', 5: 'five\'s a fix', 6: 'six is alive',
+               7: 'sevens galore', 8: 'eight\'s a spree', 9: 'nine\'ll do', 10: '31'}
+
     def __init__(self, players, game=None):
         self.game = game
         self.players = players
@@ -185,7 +201,7 @@ class Round:
             self.interface = RoundVisualInterface(self.game.table)
         else:
             self.interface = RoundTestInterface()
-        [p.set_interface(self) for p in self.players]
+        [p.set_round_and_interface(self) for p in self.players]
         self.deal()
 
     def play_round(self):
@@ -216,10 +232,10 @@ class Round:
         self.face_up_card = self.the_pack.deal(1)[0]
         self.interface.turn_up_top_card(self.face_up_card)
         if self.face_up_card.rank == 11:
-            heels_notification = 'Two for his heels!'
-            updated_score = self.interface.update_pegs(self.box_owner, 2)
-            heels_notification += self.check_for_win(self.box_owner, updated_score)
-            self.interface.update_score_info(heels_notification)
+            # heels_notification = 'Two for his heels!'
+            # heels_notification += self.check_for_win(self.box_owner, updated_score)
+            self.interface.update_score_info('Two for his heels!')
+            self.interface.increment_pegs(self.box_owner, 2)
 
     def pegging_round(self):
             # TODO: does the computer always knock?  It doesn't when I play the 'go' card
@@ -251,35 +267,24 @@ class Round:
 
     def play_card(self, player, card_played):
         ''' see if this card gets any points and show new scores when a valid card is played'''
-        for_text = ''
-        run_tot_text = str(self.ps.running_total)
         self.ps.add_card(card_played)
         turn_score = self.ps.get_last_card_points()
-        total_score = self.interface.update_pegs(player, turn_score)
-
-        if self.ps.running_total == 31:
-            for_text = self.congratulations_on_getting_31()
-        else:
-            run_tot_text = str(self.ps.running_total)
-
-        win_str = ''
-        if turn_score > 0:
-            for_text += f' for {turn_score}'
-            win_str = self.check_for_win(player, total_score)
-
-        score_string = run_tot_text + for_text + win_str
+        score_string = self.compose_score_string(turn_score)
         self.last_score_comment = score_string
         self.interface.update_score_info(self.interface.log_card_played(player,
                                                                         card_played, score_string))
+        self.interface.increment_pegs(player, turn_score)
 
-    def congratulations_on_getting_31(self):
-        congrats = ''
-        dict_31 = {1: 'one-ty', 2: 'two\'s in time', 3: 'three\'s awake', 4: 'four\'s in heaven',
-                   5: 'five\'s a fix', 6: 'six is alive', 7: 'sevens galore',
-                   8: 'eight\'s a spree', 9: 'nine\'ll do', 10: '31'}
-        if self.ps[-1].value in dict_31:
-            congrats = f', {dict_31[self.ps[-1].value]}!'
-        return congrats
+    def compose_score_string(self, added_points):
+        score_string = f'{self.running_total_or_31_string()}'
+        if added_points:
+            score_string += f' for {added_points}'
+        return score_string
+
+    def running_total_or_31_string(self):
+        if self.ps.running_total == 31 and self.ps[-1].value in self.dict_31:
+            return f'{31 - self.ps[-1].value}, {self.dict_31[self.ps[-1].value]}!'
+        return f'{self.ps.running_total}'
 
     def award_go_point(self, player):
         just_won = 'WON' in self.last_score_comment
@@ -290,9 +295,9 @@ class Round:
             last_score += 1
             score_string = f'{self.last_score_comment[:start_of_for + 6].rstrip()} and a go is ' \
                            f'{last_score}'
-            updated_score = self.interface.update_pegs(player, 1, False)
+            updated_score = self.interface.move_front_peg_for_additional_go_point(player)
         else:
-            updated_score = self.interface.update_pegs(player, 1)
+            updated_score = self.interface.increment_pegs(player, 1)
             score_string = f'{self.ps.running_total} for 1'
 
         if just_won:
@@ -303,12 +308,11 @@ class Round:
         self.interface.update_score_info(score_string)
 
     def check_for_win(self, player_just_scored, score):
-        congrats = ''
-        if self.game is not None:
-            if score >= WIN_SCORE and not self.game.win_detected:
-                self.game.win_detected = True
-                congrats = f' -- {player_just_scored.ownership_string.upper()} WON!!!'
-        return congrats
+        # if self.game:# is not None:
+        #     if score >= WIN_SCORE and not self.game.win_detected:
+        #         self.game.win_detected = True
+        #         return f' -- {player_just_scored.ownership_string.upper()} WON!!!'
+        return ''
 
     def reset_variables_at_31(self):
         for p in self.players:
@@ -325,12 +329,8 @@ class Round:
 
     def evaluate_hand(self, hand_to_score):
         hs = HandScore(hand_to_score, self.face_up_card)
-        str_info = str(hs)
-        str_info = self.interface.hand_display(hand_to_score) + str_info
-
-        new_score = self.interface.update_pegs(hand_to_score.owner, hs.points_value)
-        str_info += self.check_for_win(hand_to_score.owner, new_score)
-        self.interface.update_score_info(str_info)
+        self.interface.update_score_info(f'{self.interface.hand_display(hand_to_score)}{hs}')
+        self.interface.increment_pegs(hand_to_score.owner, hs.points_value)
 
 
 class PeggingSequence:
@@ -400,7 +400,10 @@ class RoundInterface:
         self.turn_over_played_cards_on_next_turn = False
         self.active_box_buttons = None
 
-    def update_pegs(self, whose_turn, points_to_add, back_peg_moves=True):
+    def increment_pegs(self, whose_turn, points_to_add):
+        return 0
+
+    def move_front_peg_for_additional_go_point(self, player):
         return 0
 
     def update_played_cards(self, cards):
@@ -486,8 +489,11 @@ class RoundVisualInterface(RoundInterface):
         self.table.face_up_card_buttons[0].card = None
         self.table.face_up_card_buttons[0].show(face_up=False)
 
-    def update_pegs(self, whose_turn, points_to_add, back_peg_moves=True):
-        return self.table.peg_board.increment_row_by(whose_turn, points_to_add, back_peg_moves)
+    def increment_pegs(self, whose_turn, points_to_add):
+        return whose_turn.pegs.increment_by(points_to_add)
+
+    def move_front_peg_for_additional_go_point(self, whose_turn):
+        return whose_turn.pegs.extend_for_go_point()
 
     def update_played_cards(self, played_cards):
         no_of_cards_down = len(played_cards)
@@ -588,9 +594,9 @@ class Player:
         self.knocked = False
         self.round = None
         self.initial_card_list = []
-        self.card_buttons = self.box_buttons = None
+        self.card_buttons = self.box_buttons = self.pegs = None
 
-    def set_interface(self, round):
+    def set_round_and_interface(self, round):
         self.round = round
         self.interface = round.interface
 
@@ -623,8 +629,8 @@ class ComputerPlayer(Player):
         self.ownership_string = self.name + ' has'
         self.possessive = self.name.lower() + '\'s'
 
-    def set_interface(self, round):
-        super(ComputerPlayer, self).set_interface(round)
+    def set_round_and_interface(self, round):
+        super(ComputerPlayer, self).set_round_and_interface(round)
         if type(self.interface) is RoundVisualInterface:
             self.card_buttons = self.interface.table.comp_card_buttons
             self.box_buttons = self.interface.table.comp_box_buttons
@@ -697,7 +703,7 @@ class ComputerPlayer(Player):
     def select_card_to_play(self):
         test_ps = self.round.ps.__copy__()
         available_cards = self.get_playable_cards()
-        if len(available_cards) == 1:
+        if len(available_cards) == 1:   # TODO: Computer IS LEADING WITH A 5
             return available_cards[0]
         card_scores = []
         for c in available_cards:
@@ -716,8 +722,8 @@ class HumanPlayer(Player):
         self.ownership_string = 'You have'
         self.possessive = 'my'
 
-    def set_interface(self, round):
-        super(HumanPlayer, self).set_interface(round)
+    def set_round_and_interface(self, round):
+        super(HumanPlayer, self).set_round_and_interface(round)
         if type(self.interface) is RoundVisualInterface:
             self.card_buttons = self.interface.table.player_card_buttons
             self.box_buttons = self.interface.table.player_box_buttons
@@ -745,64 +751,48 @@ class HumanPlayer(Player):
         return self.interface.player_picks_card(self.round)
 
 
-class PegBoard:
-    def __init__(self, screen_labels):
-        self.peg_rows = [PegRow(sl) for sl in screen_labels]
-        [sl.grid(row=index) for index, sl in enumerate(screen_labels)]
-        self.players = None
-
-    def set_players(self, players):
-        self.players = players[::-1]
-
-    def increment_row_by(self, player, point_incr, back_peg_moves=True):
-        pr_index = self.players.index(player)
-        return self.peg_rows[pr_index].increment_by(point_incr, back_peg_moves)
-
-    def reset(self):
-        [pr.reset() for pr in self.peg_rows]
-
-
 class PegRow:
-    empty_peg_row = '¦' + ((WIN_SCORE // 5) * (5 * '.' + '¦'))
+    win_score = 11
+    empty_peg_row = '¦' + ((win_score // 5) * (5 * '.' + '¦'))
     peg = '\u2022'
 
     def __init__(self, screen_label):
         self.screen_label = screen_label
         self.front_peg = self.back_peg = 0
         self.full_peg_row = ''
-        if __name__ == '__main__':
+        self.game = None
+        if __name__ == '__main__':  # there are unit tests specifically for PegRow
             screen_label.configure(font=('courier', 10))
         self.draw_for_new_game()
 
-    def reset(self):
-        self.front_peg = self.back_peg = 0
-        self.draw_for_new_game()
+    def increment_by(self, points_to_add):
+        if points_to_add > 0:
+            self.back_peg = self.front_peg
+            self.front_peg += points_to_add
+            self.move_peg_or_pegs()
+        return self.front_peg
 
-    def draw_for_new_game(self):
-        self.full_peg_row = f'{self.peg} {self.empty_peg_row} {"0".rjust(5)}'
+    def extend_for_go_point(self):
+        self.front_peg += 1
+        self.move_peg_or_pegs()
+        return self.front_peg
+
+    def move_peg_or_pegs(self):
+        self.full_peg_row = f'  {self.empty_peg_row}  '
+        self.insert_peg_for_score(self.back_peg)
+        self.insert_peg_for_score(self.front_peg)
+        self.full_peg_row += str(self.front_peg).rjust(4)
+        self.check_for_win()
         self.draw()
 
     def draw(self):
         if __name__ == '__main__':
             self.screen_label.configure(text=self.full_peg_row)
 
-    def increment_by(self, points_to_add, move_back_peg=True):
-        if points_to_add == 0:
-            return self.front_peg
-
-        if move_back_peg:
-            self.back_peg = self.front_peg
-        self.front_peg += points_to_add
-
-        self.full_peg_row = f'  {self.empty_peg_row}  '
-        self.insert_peg_for_score(self.back_peg)
-        self.insert_peg_for_score(self.front_peg)
-
-        self.full_peg_row += str(self.front_peg).rjust(4)
-
-        if __name__ == '__main__':
-            self.draw()
-        return self.front_peg
+    def check_for_win(self):
+        if self.game:
+            if not self.game.win_detected and self.front_peg >= self.win_score:
+                self.game.record_win(self)
 
     def insert_peg_for_score(self, peg_value):
         peg_position = self.calc_peg_pos(peg_value)
@@ -813,8 +803,8 @@ class PegRow:
         ''' give the position in an full peg row (with two spaces at each end) for a given absolute score'''
         if score == 0:
             return 0
-        if score >= WIN_SCORE:
-            return WIN_SCORE + (WIN_SCORE // 5) + 3
+        if score >= self.win_score:
+            return self.win_score + (self.win_score // 5) + 3
         fives = score // 5
         ones = score % 5
 
@@ -822,6 +812,14 @@ class PegRow:
         if ones > 0:
             position += 1
         return position
+
+    def reset(self):
+        self.front_peg = self.back_peg = 0
+        self.draw_for_new_game()
+
+    def draw_for_new_game(self):
+        self.full_peg_row = f'{self.peg} {self.empty_peg_row} {"0".rjust(5)}'
+        self.draw()
 
 
 class Pack:
