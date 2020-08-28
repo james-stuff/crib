@@ -13,7 +13,6 @@ CLUBS = '\u2663'
 DIAMONDS = '\u2666'
 SPADES = '\u2660'
 SUITS = [HEARTS, CLUBS, DIAMONDS, SPADES]
-WIN_SCORE = 11
 NUMBERS = ['zero', 'a', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
            'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen']
 VERSION = '2.1.9'
@@ -95,7 +94,6 @@ class Table:
         self.btControl.configure(command=lambda: self.card_var.set(19))
         self.score_info.set('')
         self.l_score.configure(bg='green')
-        # self.peg_board.reset()
         [pr.reset() for pr in self.peg_rows]
 
     def await_control_button_click(self, instruction):
@@ -191,7 +189,7 @@ class Round:
         self.players = players
         self.box_cards = []
         self.ps = PeggingSequence()
-        self.last_score_comment = ''
+        self.last_score = 0
         self.the_pack = Pack()
         self.box = self.box_owner = self.face_up_card = None
         self.ordered_players = []
@@ -232,8 +230,6 @@ class Round:
         self.face_up_card = self.the_pack.deal(1)[0]
         self.interface.turn_up_top_card(self.face_up_card)
         if self.face_up_card.rank == 11:
-            # heels_notification = 'Two for his heels!'
-            # heels_notification += self.check_for_win(self.box_owner, updated_score)
             self.interface.update_score_info('Two for his heels!')
             self.interface.increment_pegs(self.box_owner, 2)
 
@@ -266,14 +262,16 @@ class Round:
         return self.ps.card_does_not_break_31(card)
 
     def play_card(self, player, card_played):
-        ''' see if this card gets any points and show new scores when a valid card is played'''
+        won_already = self.game and self.game.win_detected
         self.ps.add_card(card_played)
         turn_score = self.ps.get_last_card_points()
         score_string = self.compose_score_string(turn_score)
-        self.last_score_comment = score_string
+        self.last_score = turn_score
         self.interface.update_score_info(self.interface.log_card_played(player,
                                                                         card_played, score_string))
         self.interface.increment_pegs(player, turn_score)
+        if self.game and not won_already and self.game.win_detected:
+            self.ps.winning_card = len(self.ps)
 
     def compose_score_string(self, added_points):
         score_string = f'{self.running_total_or_31_string()}'
@@ -287,38 +285,35 @@ class Round:
         return f'{self.ps.running_total}'
 
     def award_go_point(self, player):
-        just_won = 'WON' in self.last_score_comment
-        last_score = 0
-        if 'for' in self.last_score_comment:
-            start_of_for = self.last_score_comment.index('for')
-            last_score = int(self.last_score_comment[start_of_for + 4:start_of_for + 6])
-            last_score += 1
-            score_string = f'{self.last_score_comment[:start_of_for + 6].rstrip()} and a go is ' \
-                           f'{last_score}'
-            updated_score = self.interface.move_front_peg_for_additional_go_point(player)
+        if self.last_score:
+            score_string = f'{self.compose_score_string(self.last_score)} and a go is ' \
+                           f'{self.last_score + 1}'
+            self.interface.update_score_info(score_string)
+            self.interface.move_front_peg_for_additional_go_point(player)
         else:
-            updated_score = self.interface.increment_pegs(player, 1)
             score_string = f'{self.ps.running_total} for 1'
+            self.interface.update_score_info(score_string)
+            self.interface.increment_pegs(player, 1)
 
-        if just_won:
-            score_string += f' {self.last_score_comment[start_of_for + 6:]}'
-        else:
-            score_string += self.check_for_win(player, updated_score)
+        if self.ps.winning_card == len(self.ps):
+            self.game.win_detected = False
+            player.pegs.check_for_win()
 
-        self.interface.update_score_info(score_string)
-
-    def check_for_win(self, player_just_scored, score):
-        # if self.game:# is not None:
-        #     if score >= WIN_SCORE and not self.game.win_detected:
-        #         self.game.win_detected = True
-        #         return f' -- {player_just_scored.ownership_string.upper()} WON!!!'
-        return ''
+        # TODO: '24 for 3 and a go is 4' did not show the win (I had 8 points before that play)
+        # (a new game was still started)
+        # just_won = 'WON' in self.last_score_comment
+        # if just_won:
+        #     score_string += f' {self.last_score_comment[start_of_for + 6:]}'
+        # else:
+        #     score_string += self.check_for_win(player, updated_score)
+        #
+        # self.interface.update_score_info(score_string)
 
     def reset_variables_at_31(self):
         for p in self.players:
             p.knocked = False
         self.interface.turn_over_played_cards_on_next_turn = True
-        self.last_score_comment = ''
+        self.last_score = 0
         self.ps.reset()
 
     def put_cards_on_table(self):
@@ -338,7 +333,7 @@ class PeggingSequence:
 
     def __init__(self):
         self.cards_down = []
-        self.running_total = 0
+        self.running_total = self.winning_card = 0
         self.cards_of_a_kind = 1
 
     def __getitem__(self, ind):
@@ -649,7 +644,9 @@ class ComputerPlayer(Player):
     def knock_if_required(self):
         super(ComputerPlayer, self).knock_if_required()
         if self.knocked:
-            self.interface.update_score_info(f'{self.round.last_score_comment}\t{self.name} knocks.')
+            prev_comment = f'{self.round.ps.running_total}'
+            prev_comment += f' for {self.round.last_score}' if self.round.last_score > 0 else ''
+            self.interface.update_score_info(f'{prev_comment}\t{self.name} knocks.')
 
     def pick_card_in_pegging(self):
         self.interface.wait_for_ctrl_btn_click(f'{self.name}\'s turn')
@@ -752,7 +749,7 @@ class HumanPlayer(Player):
 
 
 class PegRow:
-    win_score = 11
+    win_score = 121
     empty_peg_row = '¦' + ((win_score // 5) * (5 * '.' + '¦'))
     peg = '\u2022'
 

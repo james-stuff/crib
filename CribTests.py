@@ -477,6 +477,12 @@ class CribTest(unittest.TestCase):
 
         self.assertTrue(test_passes)
 
+    def test_how_many_knobs(self):
+        hoped_for_string = "One for his knob is 1"
+        with open('Test\\MonteCarloOutput2.1.8.txt', 'r', encoding='utf-8') as ref:
+            all_text = ref.read()
+            print(f'\n{hoped_for_string} comes up {all_text.count(hoped_for_string)} times')
+
     def test_monte_carlo_pegging_rounds(self):
         for round_id in range(10000):
             next_round = Crib.Round([Crib.ComputerPlayer(name='Comp 1'), Crib.ComputerPlayer()])
