@@ -193,6 +193,7 @@ class Round:
         self.the_pack = Pack()
         self.box = self.box_owner = self.face_up_card = None
         self.ordered_players = []
+        self.last_card_won_game = False
 
         if any([p for p in players if type(p) is HumanPlayer]):
             self.player_has_box = self.game.player_has_box
@@ -236,27 +237,34 @@ class Round:
     def pegging_round(self):
             # TODO: does the computer always knock?  It doesn't when I play the 'go' card
             # . . .  This is unchanged, but is it desirable?
-        for p in itertools.cycle(self.ordered_players):
+        for player in itertools.cycle(self.ordered_players):
             card_to_play = None
-            p.knock_if_required()
-            if not p.knocked:
-                card_to_play = p.pick_card_in_pegging()
+            player.knock_if_required()
+            if not player.knocked:
+                card_to_play = player.pick_card_in_pegging()
             if isinstance(card_to_play, Card):
-                self.play_card(p, card_to_play)
+                self.play_card(player, card_to_play)
                 self.interface.update_played_cards(self.ps)
 
-            # when to reset to zero:
-            if self.ps.running_total == 31:
-                self.reset_variables_at_31()
-            elif len(self.ps) == 6:
-                self.award_go_point(p)
-            elif [p.knocked for p in self.players] == [True] * len(self.players):
-                self.award_go_point(p)
+            if self.need_to_turn_over_played_cards(player):
                 self.reset_variables_at_31()
             if len(self.ps) == 6:
                 break
+
+    def need_to_turn_over_played_cards(self, whose_turn):
+        if self.ps.running_total == 31:
+            return True
+        if all([pl.knocked for pl in self.players]) or len(self.ps) == 6:
+            self.award_go_point(whose_turn)
+            return True
+        return False
+
+    def reset_variables_at_31(self):
         for p in self.players:
             p.knocked = False
+        self.interface.turn_over_played_cards_on_next_turn = True
+        self.last_score = 0
+        self.ps.reset()
 
     def card_is_small_enough(self, card):
         return self.ps.card_does_not_break_31(card)
@@ -271,18 +279,7 @@ class Round:
                                                                         card_played, score_string))
         self.interface.increment_pegs(player, turn_score)
         if self.game and not won_already and self.game.win_detected:
-            self.ps.winning_card = len(self.ps)
-
-    def compose_score_string(self, added_points):
-        score_string = f'{self.running_total_or_31_string()}'
-        if added_points:
-            score_string += f' for {added_points}'
-        return score_string
-
-    def running_total_or_31_string(self):
-        if self.ps.running_total == 31 and self.ps[-1].value in self.dict_31:
-            return f'{31 - self.ps[-1].value}, {self.dict_31[self.ps[-1].value]}!'
-        return f'{self.ps.running_total}'
+            self.last_card_won_game = True
 
     def award_go_point(self, player):
         if self.last_score:
@@ -295,26 +292,20 @@ class Round:
             self.interface.update_score_info(score_string)
             self.interface.increment_pegs(player, 1)
 
-        if self.ps.winning_card == len(self.ps):
+        if self.last_card_won_game:
             self.game.win_detected = False
             player.pegs.check_for_win()
 
-        # TODO: '24 for 3 and a go is 4' did not show the win (I had 8 points before that play)
-        # (a new game was still started)
-        # just_won = 'WON' in self.last_score_comment
-        # if just_won:
-        #     score_string += f' {self.last_score_comment[start_of_for + 6:]}'
-        # else:
-        #     score_string += self.check_for_win(player, updated_score)
-        #
-        # self.interface.update_score_info(score_string)
+    def compose_score_string(self, added_points):
+        score_string = f'{self.running_total_or_31_string()}'
+        if added_points:
+            score_string += f' for {added_points}'
+        return score_string
 
-    def reset_variables_at_31(self):
-        for p in self.players:
-            p.knocked = False
-        self.interface.turn_over_played_cards_on_next_turn = True
-        self.last_score = 0
-        self.ps.reset()
+    def running_total_or_31_string(self):
+        if self.ps.running_total == 31 and self.ps[-1].value in self.dict_31:
+            return f'{31 - self.ps[-1].value}, {self.dict_31[self.ps[-1].value]}!'
+        return f'{self.ps.running_total}'
 
     def put_cards_on_table(self):
         self.evaluate_hand(self.ordered_players[0].hand)
@@ -333,7 +324,7 @@ class PeggingSequence:
 
     def __init__(self):
         self.cards_down = []
-        self.running_total = self.winning_card = 0
+        self.running_total = 0
         self.cards_of_a_kind = 1
 
     def __getitem__(self, ind):

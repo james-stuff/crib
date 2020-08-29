@@ -460,7 +460,11 @@ class CribTest(unittest.TestCase):
             with open(two_files[1], 'r', encoding='utf-8') as ref_file:
                 ref_text = ref_file.read()
                 for us in unique_strings_found:
-                    if not re.search(us, ref_text):
+                    if not re.search(f'[{suits_regex}|\n]{us}\n', ref_text):
+                        # make sure search includes possible terminating chars either side
+                        # so as to exclude lines where our string is only a partial match
+                        # (as happened with 'go' point bug where '0 for 1' was not spotted
+                        # because '30 for 1' was also matched)
                         missing_strings.append(us)
             return missing_strings
 
