@@ -20,63 +20,63 @@ SPADES = Crib.SPADES#'\u2660'
 class CribTest(unittest.TestCase):
     
     def testFifteenTwo(self):
-        h = Crib.Hand([cc(5, HEARTS), cc(10, SPADES)], Crib.ComputerPlayer())
+        h = Crib.Hand([cc(5, HEARTS), cc(10, SPADES)])
         score = Crib.HandScore(h)
         self.assertEqual(2, score.points_value)
         print('\n', score)
         
     def testFifteenEight(self):
-        h = Crib.Hand([cc(5, HEARTS), cc(10, SPADES), cc(5, DIAMONDS), cc(10, CLUBS)], Crib.ComputerPlayer())
+        h = Crib.Hand([cc(5, HEARTS), cc(10, SPADES), cc(5, DIAMONDS), cc(10, CLUBS)])
         score = Crib.HandScore(h)
         self.assertEqual(12, score.points_value)
         print('\n', score)
         
     def testLongFifteen(self):
-        h = Crib.Hand([cc(1, HEARTS), cc(12, SPADES), cc(2, DIAMONDS), cc(2, CLUBS)], Crib.HumanPlayer())
+        h = Crib.Hand([cc(1, HEARTS), cc(12, SPADES), cc(2, DIAMONDS), cc(2, CLUBS)])
         score = Crib.HandScore(h)
         self.assertEqual(4, score.points_value)
         print('\n', score)
         
     def testLongFifteensInTheBox(self):
-        h = Crib.Hand([cc(1, CLUBS), cc(9, SPADES), cc(3, HEARTS), cc(2, DIAMONDS), cc(2, CLUBS)], Crib.HumanPlayer())
+        h = Crib.Hand([cc(1, CLUBS), cc(9, SPADES), cc(3, HEARTS), cc(2, DIAMONDS), cc(2, CLUBS)])
         score = Crib.HandScore(h)
         self.assertEqual(12, score.points_value)
         print('\n', score)
         
     def testTripletFifteen(self):
-        h = Crib.Hand([cc(1, HEARTS), cc(13, SPADES), cc(2, DIAMONDS), cc(4, CLUBS)], Crib.ComputerPlayer())
+        h = Crib.Hand([cc(1, HEARTS), cc(13, SPADES), cc(2, DIAMONDS), cc(4, CLUBS)])
         score = Crib.HandScore(h)
         self.assertEqual(2, score.points_value)
         print('\n', score)
                
     def testFlushInHand(self):
-        h = Crib.Hand([cc(13, CLUBS), cc(12, CLUBS), cc(6, CLUBS), cc(2, DIAMONDS)], Crib.HumanPlayer())
+        h = Crib.Hand([cc(13, CLUBS), cc(12, CLUBS), cc(6, CLUBS), cc(2, DIAMONDS)])
         score = Crib.HandScore(h)
         self.assertEqual(3, score.points_value)
         print('\n', score)
         
     def testNotAFlushInHand(self):
-        h = Crib.Hand([cc(13, CLUBS), cc(12, CLUBS), cc(2, DIAMONDS), cc(4, CLUBS)], Crib.ComputerPlayer())
+        h = Crib.Hand([cc(13, CLUBS), cc(12, CLUBS), cc(2, DIAMONDS), cc(4, CLUBS)])
         score = Crib.HandScore(h)
         self.assertEqual(0, score.points_value)
         print('\n', score)
 
     def testMultiplePairs(self):
         h = Crib.Hand([cc(12, CLUBS), cc(6, HEARTS), cc(12, DIAMONDS), cc(12, HEARTS),
-                       cc(6, DIAMONDS), cc(12, SPADES), cc(6, CLUBS)], Crib.ComputerPlayer())
+                       cc(6, DIAMONDS), cc(12, SPADES), cc(6, CLUBS)])
         score = Crib.HandScore(h)
         self.assertEqual(18, score.points_value)
         print('\n', score)
         
     def testBlotchy(self):
-        h = Crib.Hand([cc(6, HEARTS), cc(4, SPADES), cc(8, DIAMONDS), cc(2, CLUBS)], Crib.HumanPlayer())
+        h = Crib.Hand([cc(6, HEARTS), cc(4, SPADES), cc(8, DIAMONDS), cc(2, CLUBS)])
         score = Crib.HandScore(h)
         self.assertEqual(0, score.points_value)
         print('\n', score)
         
     def testMegaRuns(self):
         h = Crib.Hand([cc(9, HEARTS), cc(4, SPADES), cc(10, DIAMONDS), cc(11, CLUBS),
-                       cc(12, DIAMONDS), cc(10, HEARTS), cc(11, CLUBS), cc(3, SPADES)], Crib.ComputerPlayer())
+                       cc(12, DIAMONDS), cc(10, HEARTS), cc(11, CLUBS), cc(3, SPADES)])
         score = Crib.HandScore(h)
         self.assertEqual(20, score.points_value)
         print('\n', score)
@@ -88,19 +88,19 @@ class CribTest(unittest.TestCase):
             self.assertEqual(row.calc_peg_pos(n + 1), expected[n])
             
     def testFlushInBox(self):
-        hand = Crib.Hand([cc(10, CLUBS), cc(3, CLUBS), cc(6, CLUBS), cc(12, CLUBS)], Crib.HumanPlayer())
+        hand = Crib.Hand([cc(10, CLUBS), cc(3, CLUBS), cc(6, CLUBS), cc(12, CLUBS)])
         score = Crib.HandScore(hand, cc(13, CLUBS))
         self.assertEqual(5, score.points_value)
         print('\n', score)
         
     def testNotAFlushInBox(self):
-        hand = Crib.Hand([cc(10, CLUBS), cc(3, CLUBS), cc(6, CLUBS), cc(12, CLUBS)], Crib.ComputerPlayer())
+        hand = Crib.Hand([cc(10, CLUBS), cc(3, CLUBS), cc(6, CLUBS), cc(12, CLUBS)])
         score = Crib.HandScore(hand, cc(13, HEARTS))
         self.assertEqual(0, score.points_value)
         print('\n', score)
         
     def testDefinitelyNotAFlushInBox(self):
-        hand = Crib.Hand([cc(10, CLUBS), cc(3, SPADES), cc(6, CLUBS), cc(12, CLUBS)], Crib.HumanPlayer())
+        hand = Crib.Hand([cc(10, CLUBS), cc(3, SPADES), cc(6, CLUBS), cc(12, CLUBS)])
         score = Crib.HandScore(hand, cc(13, CLUBS))
         self.assertEqual(0, score.points_value)
         print('\n', score)
@@ -124,56 +124,56 @@ class CribTest(unittest.TestCase):
         self.assertEqual(0, ps.run_score())
         
     def testTwentyNine(self):
-        hand = Crib.Hand([cc(11, CLUBS), cc(5, DIAMONDS), cc(5, HEARTS), cc(5, SPADES)], Crib.HumanPlayer())
+        hand = Crib.Hand([cc(11, CLUBS), cc(5, DIAMONDS), cc(5, HEARTS), cc(5, SPADES)])
         score = Crib.HandScore(hand, cc(5, CLUBS))
         self.assertEqual(29, score.points_value)
         print('\n', score)
         
     def testThreeCardsForHandScore(self):
-        hand = Crib.Hand([cc(7, HEARTS), cc(7, SPADES), cc(8, DIAMONDS)], Crib.ComputerPlayer())
+        hand = Crib.Hand([cc(7, HEARTS), cc(7, SPADES), cc(8, DIAMONDS)])
         score = Crib.HandScore(hand)
         self.assertEqual(6, score.points_value)
         print('\n', score)
         
     def testThreeCardsLongFifteen(self):
-        hand = Crib.Hand([cc(6, HEARTS), cc(7, SPADES), cc(2, DIAMONDS)], Crib.ComputerPlayer())
+        hand = Crib.Hand([cc(6, HEARTS), cc(7, SPADES), cc(2, DIAMONDS)])
         score = Crib.HandScore(hand)
         self.assertEqual(2, score.points_value)
         print('\n', score)
         
     def testThreeCardsKnobCheck(self):
         # shouldn't give one for his knob
-        hand = Crib.Hand([cc(11, HEARTS), cc(7, SPADES), cc(2, HEARTS)], Crib.HumanPlayer())
+        hand = Crib.Hand([cc(11, HEARTS), cc(7, SPADES), cc(2, HEARTS)])
         score = Crib.HandScore(hand)
         self.assertEqual(0, score.points_value)
         print('\n', score)
 
     def testThreeCardsFlush(self):
-        hand = Crib.Hand([cc(11, HEARTS), cc(6, HEARTS), cc(13, HEARTS)], Crib.HumanPlayer())
+        hand = Crib.Hand([cc(11, HEARTS), cc(6, HEARTS), cc(13, HEARTS)])
         score = Crib.HandScore(hand)
         self.assertEqual(3, score.points_value)
         print('\n', score)
         
     def testHowManyPairsInFiveCards(self):
-        hand = Crib.Hand([cc(7, SPADES), cc(7, HEARTS), cc(7, SPADES), cc(7, SPADES)], Crib.ComputerPlayer())
+        hand = Crib.Hand([cc(7, SPADES), cc(7, HEARTS), cc(7, SPADES), cc(7, SPADES)])
         score = Crib.HandScore(hand, cc(7, SPADES))
         self.assertEqual(20, score.points_value)
         print('\n', score)
         
     def testRunsSimple(self):
-        hand = Crib.Hand([cc(11, HEARTS), cc(10, CLUBS), cc(12, HEARTS)], Crib.ComputerPlayer())
+        hand = Crib.Hand([cc(11, HEARTS), cc(10, CLUBS), cc(12, HEARTS)])
         score = Crib.HandScore(hand, cc(3, CLUBS))
         self.assertEqual(3, score.points_value)
         print('\n', score)
         
     def testTwoRunsOfFour(self):
-        hand = Crib.Hand([cc(11, HEARTS), cc(10, CLUBS), cc(12, HEARTS), cc(11, CLUBS)], Crib.HumanPlayer())
+        hand = Crib.Hand([cc(11, HEARTS), cc(10, CLUBS), cc(12, HEARTS), cc(11, CLUBS)])
         score = Crib.HandScore(hand, cc(9, DIAMONDS))
         self.assertEqual(10, score.points_value)
         print('\n', score)
         
     def testNoRuns(self):
-        hand = Crib.Hand([cc(11, HEARTS), cc(10, CLUBS), cc(7, HEARTS), cc(3, CLUBS)], Crib.ComputerPlayer())
+        hand = Crib.Hand([cc(11, HEARTS), cc(10, CLUBS), cc(7, HEARTS), cc(3, CLUBS)])
         score = Crib.HandScore(hand)
         self.assertEqual(0, score.points_value)
         print('\n', score)
@@ -222,35 +222,26 @@ class CribTest(unittest.TestCase):
         pr.increment_by(6)
         self.assertEqual(pr.full_peg_row[141:], '...' + '\u2022' + '.¦ ' + '\u2022' + ' 125')
         
-    def test_player_hand(self):
-        hand = Crib.Hand([cc(3, HEARTS), cc(6, DIAMONDS), cc(10, CLUBS)], Crib.HumanPlayer())
-        self.assertEqual('Show my hand', hand.display_button_text)
-
-    def test_computer_box(self):
-        hand = Crib.Box([cc(7, HEARTS), cc(8, DIAMONDS), cc(11, CLUBS),
-                          cc(13, HEARTS)], Crib.ComputerPlayer())
-        self.assertEqual('Show computer\'s box', hand.display_button_text)
-
     def test_hand_score(self):
-        hand = Crib.Hand([cc(11, HEARTS), cc(10, CLUBS), cc(12, HEARTS), cc(11, CLUBS)], Crib.HumanPlayer())
+        hand = Crib.Hand([cc(11, HEARTS), cc(10, CLUBS), cc(12, HEARTS), cc(11, CLUBS)])
         hs = Crib.HandScore(hand, cc(9, DIAMONDS))
         print('\n', hs)
         self.assertEqual(10, hs.points_value)
 
     def test_hand_score_fifteens(self):
-        hand = Crib.Hand([cc(5, HEARTS), cc(10, CLUBS), cc(12, HEARTS), cc(11, CLUBS)], Crib.HumanPlayer())
+        hand = Crib.Hand([cc(5, HEARTS), cc(10, CLUBS), cc(12, HEARTS), cc(11, CLUBS)])
         hs = Crib.HandScore(hand, cc(5, DIAMONDS))
         print('\n', hs)
         self.assertEqual(17, hs.points_value)
 
     def test_hand_score_fifteens_and_nothing_else(self):
-        hand = Crib.Hand([cc(5, HEARTS), cc(10, CLUBS), cc(12, HEARTS), cc(13, CLUBS)], Crib.HumanPlayer())
+        hand = Crib.Hand([cc(5, HEARTS), cc(10, CLUBS), cc(12, HEARTS), cc(13, CLUBS)])
         hs = Crib.HandScore(hand, cc(2, DIAMONDS))
         print('\n', hs)
         self.assertEqual(6, hs.points_value)
 
     def test_morgans_orchard_and_one_for_his_knob(self):
-        hand = Crib.Hand([cc(4, HEARTS), cc(11, HEARTS), cc(11, CLUBS)], Crib.ComputerPlayer())
+        hand = Crib.Hand([cc(4, HEARTS), cc(11, HEARTS), cc(11, CLUBS)])
         hs = Crib.HandScore(hand, cc(4, CLUBS))
         print('\n', hs)
         self.assertEqual(5, hs.points_value)
@@ -262,11 +253,6 @@ class CribTest(unittest.TestCase):
         dict_suits = {globals()[gk]: gk.lower() for gk in globals().keys() if globals()[gk] in Crib.SUITS}
         print(dict_suits)
         # print(globals())
-
-    def test_box_object(self):
-        player = Crib.HumanPlayer()
-        box = Crib.Box([cc(1, SPADES)], player)
-        print(box.set_display_button_text())
 
     def test_box_cards_easy(self):
         computer = Crib.ComputerPlayer()
@@ -429,7 +415,7 @@ class CribTest(unittest.TestCase):
         def compare_files(two_files):
             suits_regex = '|'.join(Crib.SUITS)
             def is_interesting(raw_line):
-                exclude_list = [' box', '[', '===', 'turned up:']
+                exclude_list = [' box', '===', 'turned up:']
                 for exclude in exclude_list:
                     if exclude in raw_line:
                         return False
@@ -439,6 +425,9 @@ class CribTest(unittest.TestCase):
                 whole_line = raw_line[:-1]
                 if ' : ' in whole_line:
                     start_ind = re.search(suits_regex, whole_line).start() + 1
+                    return whole_line[start_ind:]
+                if ']' in whole_line:
+                    start_ind = whole_line.index(']') + 1
                     return whole_line[start_ind:]
                 return whole_line
 
@@ -460,7 +449,7 @@ class CribTest(unittest.TestCase):
             with open(two_files[1], 'r', encoding='utf-8') as ref_file:
                 ref_text = ref_file.read()
                 for us in unique_strings_found:
-                    if not re.search(f'[{suits_regex}|\n]{us}\n', ref_text):
+                    if not re.search(f'[{suits_regex}|\n|\]]{us}\n', ref_text):
                         # make sure search includes possible terminating chars either side
                         # so as to exclude lines where our string is only a partial match
                         # (as happened with 'go' point bug where '0 for 1' was not spotted
@@ -481,14 +470,14 @@ class CribTest(unittest.TestCase):
 
         self.assertTrue(test_passes)
 
-    def test_how_many_knobs(self):
+    def test_how_many_knobs(self):  # or indeed other searches
         hoped_for_string = "One for his knob is 1"
         with open('Test\\MonteCarloOutput2.1.8.txt', 'r', encoding='utf-8') as ref:
             all_text = ref.read()
             print(f'\n{hoped_for_string} comes up {all_text.count(hoped_for_string)} times')
 
     def test_monte_carlo_pegging_rounds(self):
-        for round_id in range(10000):
+        for round_id in range(100):
             next_round = Crib.Round([Crib.ComputerPlayer(name='Comp 1'), Crib.ComputerPlayer()])
             next_round.interface.update_score_info('=== Monte Carlo round ' +
                                                    str(round_id).rjust(6) + '===')

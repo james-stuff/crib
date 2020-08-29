@@ -212,7 +212,7 @@ class Round:
         self.ordered_players = self.players[lead_index:] + self.players[:lead_index]
         # TODO: can I get rid of self.ordered_players and just re-order self.players each round?
         self.build_box()
-        self.box = Box(self.box_cards, self.box_owner)
+        self.box = Box(self.box_cards)
         self.turn_up_top_card()
         self.pegging_round()
         self.put_cards_on_table()
@@ -308,15 +308,15 @@ class Round:
         return f'{self.ps.running_total}'
 
     def put_cards_on_table(self):
-        self.evaluate_hand(self.ordered_players[0].hand)
+        self.evaluate_hand(self.ordered_players[0].hand, self.ordered_players[0])
         self.interface.show_cards_in_list(self.ordered_players[1].hand.cards, visible=False)
-        self.evaluate_hand(self.ordered_players[1].hand)
-        self.evaluate_hand(self.box)
+        self.evaluate_hand(self.ordered_players[1].hand, self.ordered_players[1])
+        self.evaluate_hand(self.box, self.box_owner)
 
-    def evaluate_hand(self, hand_to_score):
+    def evaluate_hand(self, hand_to_score, player):
         hs = HandScore(hand_to_score, self.face_up_card)
-        self.interface.update_score_info(f'{self.interface.hand_display(hand_to_score)}{hs}')
-        self.interface.increment_pegs(hand_to_score.owner, hs.points_value)
+        self.interface.update_score_info(f'{self.interface.hand_display(hand_to_score, player)}{hs}')
+        self.interface.increment_pegs(player, hs.points_value)
 
 
 class PeggingSequence:
@@ -434,7 +434,7 @@ class RoundInterface:
     def clear_box(self):
         pass
 
-    def hand_display(self, hand):
+    def hand_display(self, hand, owner):
         pass
 
     def end_of_round_tidy_up(self):
@@ -459,7 +459,7 @@ class RoundTestInterface(RoundInterface):
     def log_card_played(self, player, card, score_string):
         return f'{player.name} : {card}\t{score_string}'
 
-    def hand_display(self, hand):
+    def hand_display(self, hand, owner):
         return str(hand)
 
     def end_of_round_tidy_up(self):
@@ -554,9 +554,9 @@ class RoundVisualInterface(RoundInterface):
     def hide_played_card(self, card):
         [cb.remove_from_hand() for cb in self.all_card_buttons if cb.card == card]
 
-    def hand_display(self, hand):
-        self.wait_for_ctrl_btn_click(hand.display_button_text)
-        self.show_cards_in_list(hand.cards)
+    def hand_display(self, hand, owner):
+        self.wait_for_ctrl_btn_click(f'Show {owner.possessive} {type(hand).__name__.lower()}')
+        self.show_cards_in_list(hand)
         if type(hand) is Box:
             self.clear_buttons_in(self.table.player_card_buttons + self.table.comp_card_buttons)
         else:
@@ -590,7 +590,7 @@ class Player:
         self.initial_card_list = card_list
 
     def take_box_turn(self):
-        self.hand = Hand(self.initial_card_list, self)
+        self.hand = Hand(self.initial_card_list)
 
     def knock_if_required(self):
         if not self.get_playable_cards():
@@ -647,7 +647,7 @@ class ComputerPlayer(Player):
 
     def two_cards_for_box(self, dealt_hand):
         triplets = find_all_combos(dealt_hand, 3)
-        all_triplets_scored = [[t, HandScore(Hand(t, self)).points_value] for t in triplets]
+        all_triplets_scored = [[t, HandScore(Hand(t)).points_value] for t in triplets]
         self.refine_box_selection(all_triplets_scored)
         desired_triplet = max(all_triplets_scored, key=lambda tr: tr[1])[0]
         return [c for c in dealt_hand if c not in desired_triplet]
@@ -749,7 +749,7 @@ class PegRow:
         self.front_peg = self.back_peg = 0
         self.full_peg_row = ''
         self.game = None
-        if __name__ == '__main__':  # there are unit tests specifically for PegRow
+        if __name__ == '__main__':
             screen_label.configure(font=('courier', 10))
         self.draw_for_new_game()
 
@@ -856,10 +856,8 @@ def pluralise_if_necessary(word, count):
 
 
 class Hand:
-    def __init__(self, cards, owner):
+    def __init__(self, cards):
         self.cards = cards
-        self.owner = owner
-        self.display_button_text = self.set_display_button_text()
 
     def __getitem__(self, index):
         return self.cards[index]
@@ -867,16 +865,12 @@ class Hand:
     def __len__(self):
         return len(self.cards)
 
-    def set_display_button_text(self):
-        return f'Show {self.owner.possessive} {type(self).__name__.lower()}'
-
     def __str__(self):
         return f'{[str(c) for c in self.cards]}'
 
 
 class Box(Hand):
-    def __init__(self, cards, owner):
-        super(Box, self).__init__(cards, owner)
+    pass
 
 
 class HandScore:
