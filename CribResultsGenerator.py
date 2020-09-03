@@ -33,14 +33,35 @@ class PeggingScoreList(ScoreList):
         self.score_dict = {t: 0 for t in categories}
 
 
-class RoundBuilder:
+class RoundSearchable:
+    def __init__(self, first_line, bd_dicts):
+        self.round_no = int(first_line[-10:-4].lstrip())
+        self.hands_seen = 0
+        self.all_text = ''
+
+    def parse_line(self, whole_line):
+        self.all_text += whole_line
+        if whole_line[0] == '[':
+            self.hands_seen += 1
+
+    def get_hand_points_breakdown(self, hand_line, pl_ind, hd_type):
+        pass
+
+    def get_pegging_points_breakdown(self, peg_line):
+        pass
+
+    def add_go_point(self):
+        pass
+
+
+class RoundAnalyst(RoundSearchable):
     card_dict = {'A': 1, 'J': 11, 'Q': 12, 'K': 13}
     dict_of_a_kind = {1: 0, 2: 2, 3: 6, 4: 12}
 
     def __init__(self, first_line, bd_dicts):
-        self.round_no = int(first_line[-10:-4].lstrip())
+        super(RoundAnalyst, self).__init__(first_line, bd_dicts)
         self.box_owner = ''
-        self.last_scorer_index = self.hands_seen = 0
+        self.last_scorer_index = 0
         self.peg_dict = None
         self.peg_seq = Crib.PeggingSequence()
         self.player_lookup = {'Computer': COMPUTER}
@@ -124,16 +145,6 @@ class RoundBuilder:
         return [self.round_no] + [sc for pl in self.round_scores for sc in pl]
 
 
-class RoundSearcher(RoundBuilder):
-    def __init__(self, first_line, bd_dicts):
-        super(RoundSearcher, self).__init__(first_line, bd_dicts)
-        self.all_text = ''
-
-    def parse_line(self, whole_line):
-        super(RoundSearcher, self).parse_line(whole_line)
-        self.all_text += whole_line
-
-
 class CRG:
     def __init__(self, version=''):
         self.version = version
@@ -145,20 +156,34 @@ class CRG:
                                 for n in range(2)]
 
     def generate(self):
+        check_file = open(self.filename, 'r', encoding='utf-8')
+        whole_file_text = check_file.read()
         csv_vals = []
         current_round = None
+        no_of_rounds_looked_at = 0
+        round_number = previous_round_number = -1
         for line in self.file:
             if 'Monte Carlo round' in line:
-                current_round = RoundBuilder(line, self.breakdown_dicts)
+                current_round = RoundAnalyst(line, self.breakdown_dicts)
+                no_of_rounds_looked_at += 1
+                round_number = current_round.round_no
+                if round_number == previous_round_number:
+                    print(f'A duplicate Round: {round_number}')  # (none found)
+                if whole_file_text.count(f' {round_number}===') > 1:
+                    print(f'A duplicate Round: {round_number}')  # even this doesn't find any
+                previous_round_number = round_number
             elif current_round:
                 current_round.parse_line(line)
                 if current_round.hands_seen == 3:
                     csv_vals.append(current_round.get_totals())
+        print(f'lenght of csv_vals: {len(csv_vals)}')
         csv_vals.append(['Ave'] + [sum([pts[ind] for pts in csv_vals]) / len(csv_vals)
                                    for ind in range(1, 7)])
         self.file.close()
         csv_vals += self.extract_score_breakdowns()
         self.write_csv(csv_vals)
+
+        print(f'generate() says it has looked at {no_of_rounds_looked_at} rounds')
 
     def extract_score_breakdowns(self):
         bd_lines = ['']
@@ -191,11 +216,14 @@ class CRG:
         current_round = None
         for line in self.file:
             if 'Monte Carlo round' in line:
-                current_round = RoundSearcher(line, self.breakdown_dicts)
+                current_round = RoundSearchable(line, self.breakdown_dicts)
             elif current_round:
                 current_round.parse_line(line)
                 if current_round.hands_seen == 3:
                     result = re.search(regex, current_round.all_text)
+                    # TODO: only finds first instance in Round - change to finditer()?
+                    # currently, it is actually answering the question 'How many rounds
+                    # have a <regex>?'
                     if result:
                         instances += 1
                         if instances < 6:
@@ -207,6 +235,7 @@ class CRG:
             print(f' . . . including:')
             for m in matching_rounds:
                 print(f'Round {m[0]}, position {m[1]}')
+        return instances
 
 
 

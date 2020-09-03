@@ -476,17 +476,18 @@ class CribTest(unittest.TestCase):
 
     def test_how_many_knobs(self):  # or indeed other searches
         hoped_for_string = "One for his knob is 1"
-        CRG('2.1.8').search_for_regex(hoped_for_string)
+        CRG().search_for_regex(hoped_for_string)
 
     def test_smart_computer_does_not_lead_with_a_five(self):
         re_five_lead = f'[{"|".join(Crib.SUITS)}]\nComputer : 5'
-        CRG().search_for_regex(re_five_lead)
+        self.assertLessEqual(CRG().search_for_regex(re_five_lead), 20)
 
-    # def test_round_searcher(self):
-    #     CRG(version='2.1.8').search_for_regex('in heaven! for 6')
+    def test_round_searcher(self):
+        # print([CRG(version='2.1.2').search_for_regex(f'{v}!') for v in Crib.Round.dict_31.values()])
+        CRG().search_for_regex('Comp 1 has the box')
 
-    # def test_crg_on_old_version(self):
-    #     CRG(version='2.1.2').generate()
+    def test_gen_speed(self):
+        CRG().generate()
 
     def test_monte_carlo_pegging_rounds(self):
         for round_id in range(10000):
