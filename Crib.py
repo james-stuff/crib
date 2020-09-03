@@ -691,13 +691,16 @@ class ComputerPlayer(Player):
     def select_card_to_play(self):
         test_ps = self.round.ps.__copy__()
         available_cards = self.get_playable_cards()
-        if len(available_cards) == 1:   # TODO: Computer IS LEADING WITH A 5
+        if len(available_cards) == 1:
             return available_cards[0]
         card_scores = []
         for c in available_cards:
-            test_ps.add_card(c)
-            score = -1 if test_ps.running_total == c.rank == 5 else test_ps.get_last_card_points()
-            test_ps.pop_last_card()
+            if self.round.ps.running_total == 0 and c.rank == 5:
+                score = -1
+            else:
+                test_ps.add_card(c)
+                score = test_ps.get_last_card_points()
+                test_ps.pop_last_card()
             card_scores.append([c, score])
         card_scores.sort(key=lambda i: i[1])
         return card_scores[-1][0]
