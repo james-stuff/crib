@@ -5,8 +5,12 @@ Created on Sun Jan 26 11:06:38 2020
 @author: j_a_c
 """
 import csv
-import os
 import Crib
+
+
+PLAYER = PEG = 0
+COMPUTER = HAND = 1
+BOX = 2
 
 
 class ScoreList:
@@ -20,7 +24,7 @@ class HandScoreList(ScoreList):
 
 
 class PeggingScoreList(ScoreList):
-    def  __init__(self):
+    def __init__(self):
         super(PeggingScoreList, self).__init__()
         categories = self.base_score_categories.copy()
         categories.insert(1, '31')
@@ -32,62 +36,77 @@ class RoundBuilder:
     card_dict = {'A': 1, 'J': 11, 'Q': 12, 'K': 13}
     dict_of_a_kind = {1: 0, 2: 2, 3: 6, 4: 12}
 
-    def __init__(self, first_line):
+    def __init__(self, first_line, bd_dicts):
         self.round_no = int(first_line[-10:-4].lstrip())
-        self.pegging, self.hands, self.boxes = ([0, 0] for n in range(3))
-        self.hand_lines = []
-        self.all_scores, self.parsed_hands = ([] for n in range(2))
         self.box_owner = ''
-        self.pegging_points_index = 0
-        self.target_dict = None
+        self.last_scorer_index = self.hands_seen = 0
+        self.peg_dict = None
         self.peg_seq = Crib.PeggingSequence()
+        self.player_lookup = {'Computer': COMPUTER}
+        self.round_scores = [[0 for m in range(3)] for n in range(2)]
+        self.bd_dicts = bd_dicts
 
-    def parse_line(self, line):
-        if 'the box' in line:
-            self.box_owner = line[:line.index(' ha')]  # old versions say 'You have the box'
-        if line[0] == '[':
-            self.parsed_hands.append(int(line[-3:]))
-            self.hand_lines.append(line)
-            if len(self.parsed_hands) == 3:
-                self.allocate_all_points()
-        if ' : ' in line:
-            self.get_card(line)
-            self.pegging_points_index = line[:8] == 'Computer'
-            self.target_dict = PSL.score_dict if self.pegging_points_index else PLAYER_PSL.score_dict
-            if self.peg_seq.fifteen_or_thirty_one_score():
-                self.target_dict[str(self.peg_seq.running_total)] += 2
-            self.target_dict['run'] += self.peg_seq.run_score()
-            self.target_dict['pair'] += self.peg_seq.pairs_score()
-            if 'for' in line:
-                self.pegging[self.pegging_points_index] += int(line[-3:])
-        if 'go' in line or ' for 1\n' in line:
-            self.pegging[self.pegging_points_index] += 1
-            self.target_dict['go'] += 1
+    def parse_line(self, whole_line):
+        if 'the box' in whole_line:
+            self.determine_player_sequence(whole_line)
+        if ' : ' in whole_line:
+            self.handle_pegging_card(whole_line)
+        if 'go' in whole_line or ' for 1\n' in whole_line:
+            self.add_go_point()
+        if whole_line[0] == '[':
+            self.score_hand(whole_line)
 
-    def get_card(self, raw_line):
-        string_card = raw_line[raw_line.index(' : ') + 3:raw_line.index(' : ') + 6].strip()
+    def determine_player_sequence(self, box_line):
+        self.box_owner = box_line[:box_line.index(' ha')]  # old versions say 'You have the box'
+        self.add_player_to_lookup_if_needed(self.box_owner)
+
+    def add_player_to_lookup_if_needed(self, player_id):
+        if player_id not in self.player_lookup:
+            self.player_lookup[player_id] = PLAYER
+
+    def handle_pegging_card(self, raw_line):
+        player = raw_line[:raw_line.index(':')].strip()
+        self.add_player_to_lookup_if_needed(player)
+        self.last_scorer_index = self.player_lookup[player]
+        if 'for' in raw_line:
+            self.round_scores[self.player_lookup[player]][PEG] += int(raw_line[-3:])
+        self.get_pegging_points_breakdown(raw_line)
+
+    def get_card_from_pegging_line(self, peg_line):
+        colon_pos = peg_line.index(' : ')
+        string_card = peg_line[colon_pos + 3:colon_pos + 6].strip()
         suit = string_card[-1]
         raw_rank = string_card[:-1]
         rank = self.card_dict[raw_rank] if raw_rank in self.card_dict else int(raw_rank)
-        self.peg_seq.add_card(Crib.Card(rank, suit))
+        return Crib.Card(rank, suit)
 
-    def allocate_all_points(self):
-        self.hands = self.parsed_hands[:2]
-        ah_index = 1
-        if self.box_owner == 'Comp 1' or self.box_owner == 'You':
-            self.hands = self.hands[::-1]
-            ah_index = 0
-        self.analyse_hands(ah_index)
-        self.boxes[self.box_owner == 'Computer'] = self.parsed_hands[2]
-        self.all_scores = [self.pegging, self.hands, self.boxes]
+    def add_go_point(self):
+        self.round_scores[self.last_scorer_index][PEG] += 1
+        self.peg_dict['go'] += 1
 
-    def analyse_hands(self, hand_index):
-        score_types = list(HSL.score_dict.keys())
+    def score_hand(self, hand_line):
+        self.hands_seen += 1
+        player_index = self.player_lookup[self.box_owner] if self.hands_seen > 1 else \
+            [v for k, v in self.player_lookup.items() if k != self.box_owner][0]
+        hand_type = HAND if self.hands_seen < 3 else BOX
+        self.round_scores[player_index][hand_type] = int(hand_line[-3:])
+        self.get_hand_points_breakdown(hand_line, player_index, hand_type)
+
+    def get_pegging_points_breakdown(self, peg_line):
+        self.peg_seq.add_card(self.get_card_from_pegging_line(peg_line))
+        self.peg_dict = self.bd_dicts[self.last_scorer_index][PEG].score_dict
+        if self.peg_seq.fifteen_or_thirty_one_score():
+            self.peg_dict[str(self.peg_seq.running_total)] += 2
+        self.peg_dict['run'] += self.peg_seq.run_score()
+        self.peg_dict['pair'] += self.peg_seq.pairs_score()
+
+    def get_hand_points_breakdown(self, hand_line, pl_ind, hd_type):
+        score_types = list(HandScoreList().score_dict.keys())
         number_dict = dict(zip(Crib.NUMBERS[:7], range(7)))
         number_dict['one'] = 1
-        score_line = self.hand_lines[hand_index].lower()
+        score_line = hand_line.lower()
         score_line = score_line[score_line.index(']') + 1:]
-        HSL.score_dict['15'] += score_line.count('fifteen') * 2
+        self.bd_dicts[pl_ind][hd_type].score_dict['15'] += score_line.count('fifteen') * 2
         score_words = [sw.strip(',s') if sw[-1] == 's' else sw.strip(',') for sw in score_line.split()]
         for st in score_types[1:]:
             if st in score_words:
@@ -96,48 +115,53 @@ class RoundBuilder:
                 if st != 'knob':
                     occurrences = number_dict[score_words[ind - 1]]
                     length = 2 if st == 'pair' else number_dict[score_words[ind + 2]]
-                HSL.score_dict[st] += occurrences * length
+                self.bd_dicts[pl_ind][hd_type].score_dict[st] += occurrences * length
         if 'orchard' in score_words:
-            HSL.score_dict['pair'] += 4
-        # if self.round_no == 3566:
-        #     print(f'score types: {score_types}')
-        #     print(f'score in words: {[w for w in score_words]}')
+            self.bd_dicts[pl_ind][hd_type].score_dict['pair'] += 4
 
     def get_totals(self):
-        return [self.round_no] + [a[n] for n in range(2) for a in self.all_scores]
+        return [self.round_no] + [sc for pl in self.round_scores for sc in pl]
 
 
-our_file = [f for f in os.listdir('.') if 'MonteCarloOutput' in f][0]
-version_no = our_file[16:our_file.index('.txt')]
-# our_file = 'Previous versions\\MonteCarloOutput2.1.2.txt'
-# version_no = '2.1.2'
+class CRG:
+    def __init__(self, version=''):
+        self.version = version
+        if not self.version:
+            self.version = Crib.VERSION
+        self.filename = f'MonteCarloOutput{self.version}.txt'
+        self.file = open(self.filename, 'r', encoding='utf-8')
+        self.breakdown_dicts = [[PeggingScoreList(), HandScoreList(), HandScoreList()]
+                                for n in range(2)]
 
-PSL = PeggingScoreList()
-PLAYER_PSL = PeggingScoreList()
-HSL = HandScoreList()
+    def generate(self):
+        csv_vals = []
+        current_round = None
+        for line in self.file:
+            if 'Monte Carlo round' in line:
+                current_round = RoundBuilder(line, self.breakdown_dicts)
+            elif current_round:
+                current_round.parse_line(line)
+                if current_round.hands_seen == 3:
+                    csv_vals.append(current_round.get_totals())
+        csv_vals.append(['Ave'] + [sum([pts[ind] for pts in csv_vals]) / len(csv_vals)
+                                   for ind in range(1, 7)])
+        self.file.close()
+        self.write_csv(csv_vals)
+        ref_dict = {'15': 3018, '31': 1724, 'pair': 4706, 'run': 3547, 'go': 8254}
+        print(f'Computer pegging dictionary still OK? '
+              f'{self.breakdown_dicts[COMPUTER][PEG].score_dict == ref_dict}')
+        print('All scoring dictionaries:')
+        for pl in self.breakdown_dicts:
+            for score in pl:
+                print(f'{score.score_dict}')
 
-with open(our_file, 'r', encoding='utf-8') as raw_file:
-    final_results = []
-    current_round = None
-    for line in raw_file:
-        if 'Monte Carlo round' in line:
-            current_round = RoundBuilder(line)
-        elif current_round:
-            current_round.parse_line(line)
-            if len(current_round.all_scores) == 3:
-                final_results.append(current_round.get_totals())
-    no_of_rounds = len(final_results)
-    final_results.append(['Ave'] + [sum([pts[ind] for pts in final_results]) / 10000
-                                    for ind in range(1, 7)])
+    def write_csv(self, values):
+        with open('MonteCarloResults' + self.version + '.csv', 'w', newline='') as csv_file:
+            csv_file.writelines(',,PLAYER,,,COMPUTER,\n')
+            csv_file.writelines(f'Round,{"Peg, Hand, Box," * 2}\n')
+            csv_writer = csv.writer(csv_file, quoting=csv.QUOTE_NONNUMERIC)
+            csv_writer.writerows(values)
 
-with open('MonteCarloResults' + version_no + '.csv', 'w', newline='') as csv_file:
-    csv_file.writelines(',,PLAYER,,,COMPUTER,\n')
-    csv_file.writelines(f'Round,{"Peg, Hand, Box," * 2}\n')
-    csvw = csv.writer(csv_file, quoting=csv.QUOTE_NONNUMERIC)
-    csvw.writerows(final_results)
 
-print(PSL.score_dict)
-ref_dict = {'15': 3018, '31': 1724, 'pair': 4706, 'run': 3547, 'go': 8254}
-print(f'PSL dictionary still OK? {PSL.score_dict == ref_dict}')
-print(f'Player scores: {PLAYER_PSL.score_dict}')
-print(f'Hand scores: {HSL.score_dict}')
+if __name__ == '__main__':
+    CRG(version='2.1.8').generate()
