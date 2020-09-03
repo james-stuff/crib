@@ -146,14 +146,26 @@ class CRG:
         csv_vals.append(['Ave'] + [sum([pts[ind] for pts in csv_vals]) / len(csv_vals)
                                    for ind in range(1, 7)])
         self.file.close()
+        csv_vals += self.extract_score_breakdowns()
         self.write_csv(csv_vals)
-        ref_dict = {'15': 3018, '31': 1724, 'pair': 4706, 'run': 3547, 'go': 8254}
-        print(f'Computer pegging dictionary still OK? '
-              f'{self.breakdown_dicts[COMPUTER][PEG].score_dict == ref_dict}')
-        print('All scoring dictionaries:')
-        for pl in self.breakdown_dicts:
-            for score in pl:
-                print(f'{score.score_dict}')
+
+    def extract_score_breakdowns(self):
+        bd_lines = ['']
+        all_score_types = ['15', '31', 'go', 'run', 'flush', 'pair', 'knob']
+        for st in all_score_types:
+            new_line = [st]
+            for pl in self.breakdown_dicts:
+                for score_list in pl:
+                    if st in score_list.score_dict:
+                        new_line.append(score_list.score_dict[st])
+                    else:
+                        new_line.append('')
+            bd_lines.append(new_line)
+        totals = [sum([bd[n] for bd in bd_lines[1:] if isinstance(bd[n], int)])
+                  for n in range(1, 7)]
+        bd_lines.append(['Totals'] + totals)
+        return bd_lines
+
 
     def write_csv(self, values):
         with open('MonteCarloResults' + self.version + '.csv', 'w', newline='') as csv_file:

@@ -11,6 +11,7 @@ import tkinter
 from Crib import Card as cc
 import os
 import re
+from CribResultsGenerator import CRG
 
 HEARTS = '\u2665'
 CLUBS = '\u2663'
@@ -369,6 +370,8 @@ class CribTest(unittest.TestCase):
         differences = 0
         print('\n')
         for line_no, line in enumerate(test_subject.readlines()):
+            if line_no > 10002:
+                break
             expected_line = ref_file.readline()
             if line != expected_line:
                 differences += 1
@@ -487,6 +490,9 @@ class CribTest(unittest.TestCase):
         # crawler.rounds_containing_interesting_text('flush of four is 9')
         # print(f'First occurrence is in round no. {crawler.get_round_from_byte_position(5081)}')
         print(f'Number of rounds looked at: {crawler.crawl()}')
+
+    def test_crg_on_old_version(self):
+        CRG(version='2.1.2').generate()
 
     def test_monte_carlo_pegging_rounds(self):
         for round_id in range(100):
