@@ -6,6 +6,7 @@ Created on Sun Jan 26 11:06:38 2020
 """
 import csv
 import Crib
+import re
 
 
 PLAYER = PEG = 0
@@ -123,6 +124,16 @@ class RoundBuilder:
         return [self.round_no] + [sc for pl in self.round_scores for sc in pl]
 
 
+class RoundSearcher(RoundBuilder):
+    def __init__(self, first_line, bd_dicts):
+        super(RoundSearcher, self).__init__(first_line, bd_dicts)
+        self.all_text = ''
+
+    def parse_line(self, whole_line):
+        super(RoundSearcher, self).parse_line(whole_line)
+        self.all_text += whole_line
+
+
 class CRG:
     def __init__(self, version=''):
         self.version = version
@@ -173,6 +184,30 @@ class CRG:
             csv_file.writelines(f'Round,{"Peg, Hand, Box," * 2}\n')
             csv_writer = csv.writer(csv_file, quoting=csv.QUOTE_NONNUMERIC)
             csv_writer.writerows(values)
+
+    def search_for_regex(self, regex):
+        matching_rounds = []
+        instances = 0
+        current_round = None
+        for line in self.file:
+            if 'Monte Carlo round' in line:
+                current_round = RoundSearcher(line, self.breakdown_dicts)
+            elif current_round:
+                current_round.parse_line(line)
+                if current_round.hands_seen == 3:
+                    result = re.search(regex, current_round.all_text)
+                    if result:
+                        instances += 1
+                        if instances < 6:
+                            matching_rounds.append((current_round.round_no, result.start()))
+        self.file.close()
+        print(f'\n"{regex}" was found {instances} time{"" if instances == 1 else "s"}'
+              f' in {self.filename}')
+        if instances:
+            print(f' . . . including:')
+            for m in matching_rounds:
+                print(f'Round {m[0]}, position {m[1]}')
+
 
 
 if __name__ == '__main__':

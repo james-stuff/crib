@@ -452,7 +452,8 @@ class CribTest(unittest.TestCase):
             with open(two_files[1], 'r', encoding='utf-8') as ref_file:
                 ref_text = ref_file.read()
                 for us in unique_strings_found:
-                    if not re.search(f'[{suits_regex}|\n|\]]{us}\n', ref_text):
+                    regex_string = '[' + suits_regex + r'|\n|\]]' + us + '\n'
+                    if not re.search(regex_string, ref_text):
                         # make sure search includes possible terminating chars either side
                         # so as to exclude lines where our string is only a partial match
                         # (as happened with 'go' point bug where '0 for 1' was not spotted
@@ -460,7 +461,7 @@ class CribTest(unittest.TestCase):
                         missing_strings.append(us)
             return missing_strings
 
-        latest_mco_file = [f for f in os.listdir('.') if 'MonteCarloOutput' in f][0]
+        latest_mco_file = f'MonteCarloOutput{Crib.VERSION}.txt' #[f for f in os.listdir('.') if 'MonteCarloOutput' in f][0]
         files_to_compare = [latest_mco_file, 'Test\\MonteCarloOutput2.1.8.txt']
         test_passes = True
         for step in range(1, -2, -2):
@@ -475,31 +476,25 @@ class CribTest(unittest.TestCase):
 
     def test_how_many_knobs(self):  # or indeed other searches
         hoped_for_string = "One for his knob is 1"
-        with open('Test\\MonteCarloOutput2.1.8.txt', 'r', encoding='utf-8') as ref:
-            all_text = ref.read()
-            print(f'\n{hoped_for_string} comes up {all_text.count(hoped_for_string)} times')
+        CRG('2.1.8').search_for_regex(hoped_for_string)
 
     def test_smart_computer_does_not_lead_with_a_five(self):
         re_five_lead = f'[{"|".join(Crib.SUITS)}]\nComputer : 5'
-        with open('Test\\MonteCarloOutput2.1.8.txt', 'r', encoding='utf-8') as ref:
-            all_text = ref.read()
-            print(f'\n{re_five_lead} comes up {len(re.findall(re_five_lead, all_text))} times')
+        CRG().search_for_regex(re_five_lead)
 
-    def test_monte_carlo_crawler(self):
-        crawler = mcc('MonteCarloOutput2.1.9.txt')
-        # crawler.rounds_containing_interesting_text('flush of four is 9')
-        # print(f'First occurrence is in round no. {crawler.get_round_from_byte_position(5081)}')
-        print(f'Number of rounds looked at: {crawler.crawl()}')
+    # def test_round_searcher(self):
+    #     CRG(version='2.1.8').search_for_regex('in heaven! for 6')
 
-    def test_crg_on_old_version(self):
-        CRG(version='2.1.2').generate()
+    # def test_crg_on_old_version(self):
+    #     CRG(version='2.1.2').generate()
 
     def test_monte_carlo_pegging_rounds(self):
-        for round_id in range(100):
+        for round_id in range(10000):
             next_round = Crib.Round([Crib.ComputerPlayer(name='Comp 1'), Crib.ComputerPlayer()])
             next_round.interface.update_score_info('=== Monte Carlo round ' +
                                                    str(round_id).rjust(6) + '===')
             next_round.play_round()
+        CRG().generate()
 
 
 if __name__ == '__main__':
