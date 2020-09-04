@@ -157,33 +157,20 @@ class CRG:
 
     def generate(self):
         check_file = open(self.filename, 'r', encoding='utf-8')
-        whole_file_text = check_file.read()
         csv_vals = []
         current_round = None
-        no_of_rounds_looked_at = 0
-        round_number = previous_round_number = -1
         for line in self.file:
             if 'Monte Carlo round' in line:
                 current_round = RoundAnalyst(line, self.breakdown_dicts)
-                no_of_rounds_looked_at += 1
-                round_number = current_round.round_no
-                if round_number == previous_round_number:
-                    print(f'A duplicate Round: {round_number}')  # (none found)
-                if whole_file_text.count(f' {round_number}===') > 1:
-                    print(f'A duplicate Round: {round_number}')  # even this doesn't find any
-                previous_round_number = round_number
             elif current_round:
                 current_round.parse_line(line)
                 if current_round.hands_seen == 3:
                     csv_vals.append(current_round.get_totals())
-        print(f'lenght of csv_vals: {len(csv_vals)}')
         csv_vals.append(['Ave'] + [sum([pts[ind] for pts in csv_vals]) / len(csv_vals)
                                    for ind in range(1, 7)])
         self.file.close()
         csv_vals += self.extract_score_breakdowns()
         self.write_csv(csv_vals)
-
-        print(f'generate() says it has looked at {no_of_rounds_looked_at} rounds')
 
     def extract_score_breakdowns(self):
         bd_lines = ['']

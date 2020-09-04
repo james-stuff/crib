@@ -484,10 +484,11 @@ class CribTest(unittest.TestCase):
 
     def test_round_searcher(self):
         # print([CRG(version='2.1.2').search_for_regex(f'{v}!') for v in Crib.Round.dict_31.values()])
-        CRG().search_for_regex('Comp 1 has the box')
+        CRG().search_for_regex(' is 19')
 
     def test_gen_speed(self):
-        CRG().generate()
+        # CRG().generate()
+        pass
 
     def test_monte_carlo_pegging_rounds(self):
         for round_id in range(10000):
