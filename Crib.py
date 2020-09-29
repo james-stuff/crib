@@ -896,7 +896,7 @@ class HandScore:
                 self.description += ' and one for his knob'
         if self.points_value == 0:
             self.description = 'zero points'
-            if not [c for c in self.all_cards if c.rank % 2 == 1]:
+            if all([c.rank % 2 == 0 for c in self.all_cards]):
                 self.description = 'two, four, six, eight, Blotchy Bob!'
 
     def count_fifteens(self):
