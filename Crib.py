@@ -152,22 +152,24 @@ class CardButton:
 class Game:
     def __init__(self, table):
         self.table = table
-        self.win_detected = self.is_players_turn = False
-        self.players = [HumanPlayer(), ComputerPlayer()]
-        for ind, pl in enumerate(self.players[::-1]):
+        self.win_detected = self.player_has_box = False
+        self.players = [ComputerPlayer(), HumanPlayer()]
+        for ind, pl in enumerate(self.players):
             pl.pegs = self.table.peg_rows[ind]
             pl.pegs.game = self
-        self.player_has_box = random.choice([True, False])
+        self.box_owner_index = random.randrange(len(self.players))
 
     def play(self):
         active_round = None
         while not self.win_detected:
-            self.is_players_turn = not self.player_has_box
             self.table.await_control_button_click('Deal for next round')
             if active_round:
                 active_round.interface.clear_box()
+            lead_index = (self.box_owner_index + 1) % len(self.players)
+            self.players = self.players[lead_index:] + self.players[:lead_index]
+            self.player_has_box = isinstance(self.players[-1], HumanPlayer)
             active_round = Round(self.players, game=self).play_round()
-            self.player_has_box = not self.player_has_box
+            self.box_owner_index = 0
         active_round.interface.wait_for_ctrl_btn_click('Start new game')
         self.table.face_up_card_buttons[0].show(face_up=False)
         active_round.interface.clear_box()
@@ -185,6 +187,7 @@ class Round:
                7: 'sevens galore', 8: 'eight\'s a spree', 9: 'nine\'ll do', 10: '31'}
 
     def __init__(self, players, game=None):
+        """accepts a players list in turn order"""
         self.game = game
         self.players = players
         self.box_cards = []
@@ -192,10 +195,9 @@ class Round:
         self.last_score = 0
         self.the_pack = Pack()
         self.box = self.box_owner = self.face_up_card = None
-        self.ordered_players = []
         self.last_card_won_game = False
 
-        if any([p for p in players if type(p) is HumanPlayer]):
+        if any([type(p) is HumanPlayer for p in players]):
             self.player_has_box = self.game.player_has_box
             self.interface = RoundVisualInterface(self.game.table)
         else:
@@ -204,15 +206,7 @@ class Round:
         self.deal()
 
     def play_round(self):
-        if self.game is None:
-            self.player_has_box = random.choice([True, False])
-        self.box_owner = self.players[not self.player_has_box]
-        self.interface.set_box_buttons(self.box_owner)
-        lead_index = (self.players.index(self.box_owner) + 1) % len(self.players)
-        self.ordered_players = self.players[lead_index:] + self.players[:lead_index]
-        # TODO: can I get rid of self.ordered_players and just re-order self.players each round?
         self.build_box()
-        self.box = Box(self.box_cards)
         self.turn_up_top_card()
         self.pegging_round()
         self.put_cards_on_table()
@@ -224,8 +218,12 @@ class Round:
         [self.interface.allocate_cards_after_deal(p) for p in self.players]
 
     def build_box(self):
+        self.box_owner = self.players[-1]
+        self.player_has_box = isinstance(self.box_owner, HumanPlayer)
+        self.interface.set_box_buttons(self.box_owner)
         self.interface.update_score_info(f'{self.box_owner.ownership_string} the box')
-        [p.take_box_turn() for p in self.ordered_players]
+        [p.take_box_turn() for p in self.players]
+        self.box = Box(self.box_cards)
 
     def turn_up_top_card(self):
         self.face_up_card = self.the_pack.deal(1)[0]
@@ -237,7 +235,7 @@ class Round:
     def pegging_round(self):
             # TODO: does the computer always knock?  It doesn't when I play the 'go' card
             # . . .  This is unchanged, but is it desirable?
-        for player in itertools.cycle(self.ordered_players):
+        for player in itertools.cycle(self.players):
             card_to_play = None
             player.knock_if_required()
             if not player.knocked:
@@ -308,9 +306,9 @@ class Round:
         return f'{self.ps.running_total}'
 
     def put_cards_on_table(self):
-        self.evaluate_hand(self.ordered_players[0].hand, self.ordered_players[0])
-        self.interface.show_cards_in_list(self.ordered_players[1].hand.cards, visible=False)
-        self.evaluate_hand(self.ordered_players[1].hand, self.ordered_players[1])
+        self.evaluate_hand(self.players[0].hand, self.players[0])
+        self.interface.show_cards_in_list(self.players[1].hand.cards, visible=False)
+        self.evaluate_hand(self.players[1].hand, self.players[1])
         self.evaluate_hand(self.box, self.box_owner)
 
     def evaluate_hand(self, hand_to_score, player):
