@@ -152,33 +152,27 @@ class CardButton:
 class Game:
     def __init__(self, table):
         self.table = table
-        self.win_detected = self.player_has_box = False
+        self.win_detected = False
         self.players = [ComputerPlayer(), HumanPlayer()]
         for ind, pl in enumerate(self.players):
             pl.pegs = self.table.peg_rows[ind]
             pl.pegs.game = self
+            pl.pegs.player = pl
         self.box_owner_index = random.randrange(len(self.players))
 
     def play(self):
         active_round = None
-        while not self.win_detected:
+        while not any([p.has_reached_winning_score() for p in self.players]):
             self.table.await_control_button_click('Deal for next round')
             if active_round:
                 active_round.interface.clear_box()
             lead_index = (self.box_owner_index + 1) % len(self.players)
             self.players = self.players[lead_index:] + self.players[:lead_index]
-            self.player_has_box = isinstance(self.players[-1], HumanPlayer)
-            active_round = Round(self.players, game=self).play_round()
+            active_round = Round(self.players, table=self.table).play_round()
             self.box_owner_index = 0
         active_round.interface.wait_for_ctrl_btn_click('Start new game')
         self.table.face_up_card_buttons[0].show(face_up=False)
         active_round.interface.clear_box()
-
-    def record_win(self, calling_peg_row):
-        self.win_detected = True
-        player = [p for p in self.players if p.pegs is calling_peg_row][0]
-        self.table.score_info.set(self.table.score_info.get() +
-                                  f' -- {player.ownership_string.upper()} WON!!!')
 
 
 class Round:
@@ -186,9 +180,9 @@ class Round:
                4: 'four\'s in heaven', 5: 'five\'s a fix', 6: 'six is alive',
                7: 'sevens galore', 8: 'eight\'s a spree', 9: 'nine\'ll do', 10: '31'}
 
-    def __init__(self, players, game=None):
+    def __init__(self, players, table=None):
         """accepts a players list in turn order"""
-        self.game = game
+        self.table = table
         self.players = players
         self.box_cards = []
         self.ps = PeggingSequence()
@@ -198,8 +192,7 @@ class Round:
         self.last_card_won_game = False
 
         if any([type(p) is HumanPlayer for p in players]):
-            self.player_has_box = self.game.player_has_box
-            self.interface = RoundVisualInterface(self.game.table)
+            self.interface = RoundVisualInterface(self.table)
         else:
             self.interface = RoundTestInterface()
         [p.set_round_and_interface(self) for p in self.players]
@@ -215,11 +208,14 @@ class Round:
 
     def deal(self):
         [p.receive_cards(self.the_pack.deal(5)) for p in self.players]
+        # self.players[0].receive_cards([Card(2, HEARTS), Card(4, HEARTS), Card(7, HEARTS),
+        #                                Card(9, DIAMONDS), Card(13, SPADES)])
+        # self.players[1].receive_cards([Card(3, CLUBS), Card(5, CLUBS), Card(6, CLUBS),
+        #                                Card(9, HEARTS), Card(13, DIAMONDS)])
         [self.interface.allocate_cards_after_deal(p) for p in self.players]
 
     def build_box(self):
         self.box_owner = self.players[-1]
-        self.player_has_box = isinstance(self.box_owner, HumanPlayer)
         self.interface.set_box_buttons(self.box_owner)
         self.interface.update_score_info(f'{self.box_owner.ownership_string} the box')
         [p.take_box_turn() for p in self.players]
@@ -233,8 +229,6 @@ class Round:
             self.interface.increment_pegs(self.box_owner, 2)
 
     def pegging_round(self):
-            # TODO: does the computer always knock?  It doesn't when I play the 'go' card
-            # . . .  This is unchanged, but is it desirable?
         for player in itertools.cycle(self.players):
             card_to_play = None
             player.knock_if_required()
@@ -262,13 +256,14 @@ class Round:
             p.knocked = False
         self.interface.turn_over_played_cards_on_next_turn = True
         self.last_score = 0
+        self.last_card_won_game = False
         self.ps.reset()
 
     def card_is_small_enough(self, card):
         return self.ps.card_does_not_break_31(card)
 
     def play_card(self, player, card_played):
-        won_already = self.game and self.game.win_detected
+        won_already = any([p.has_reached_winning_score() for p in self.players])
         self.ps.add_card(card_played)
         turn_score = self.ps.get_last_card_points()
         score_string = self.compose_score_string(turn_score)
@@ -276,7 +271,7 @@ class Round:
         self.interface.update_score_info(self.interface.log_card_played(player,
                                                                         card_played, score_string))
         self.interface.increment_pegs(player, turn_score)
-        if self.game and not won_already and self.game.win_detected:
+        if not won_already and any([p.has_reached_winning_score() for p in self.players]):
             self.last_card_won_game = True
 
     def award_go_point(self, player):
@@ -291,8 +286,7 @@ class Round:
             self.interface.increment_pegs(player, 1)
 
         if self.last_card_won_game:
-            self.game.win_detected = False
-            player.pegs.check_for_win()
+            self.interface.display_win(player)
 
     def compose_score_string(self, added_points):
         score_string = f'{self.running_total_or_31_string()}'
@@ -405,7 +399,7 @@ class RoundInterface:
     def allocate_cards_after_deal(self, player):
         pass
 
-    def set_box_buttons(self, player_has_box):
+    def set_box_buttons(self, player):
         pass
 
     def transfer_card_to_box(self, player, card):
@@ -436,6 +430,9 @@ class RoundInterface:
         pass
 
     def end_of_round_tidy_up(self):
+        pass
+
+    def display_win(self, player):
         pass
 
 
@@ -570,6 +567,10 @@ class RoundVisualInterface(RoundInterface):
     def clear_box(self):
         self.clear_buttons_in(self.table.player_box_buttons + self.table.comp_box_buttons)
 
+    def display_win(self, player):
+        self.update_score_info(self.table.score_info.get() +
+                               f' -- {player.ownership_string.upper()} WON!!!')
+
 
 class Player:
     def __init__(self, name=None):
@@ -599,6 +600,9 @@ class Player:
 
     def get_unplayed_cards(self):
         return set(self.hand) - set(self.round.ps)
+
+    def has_reached_winning_score(self):
+        return self.pegs.winning_score_reached() if self.pegs else False
 
     def pick_card_in_pegging(self):
         pass
@@ -681,10 +685,13 @@ class ComputerPlayer(Player):
     def evaluate_knob_potential(self, triplet):
         # I am double-rating the score instead of just adding to the score for hands that have the J
         # and taking away from hands that don't.  Only care about RELATIVE value of hands.  Is this right??
-        if self.round.player_has_box:
+        if not self.my_box():
             knob_potential = len([t for t in triplet if t.rank == 11]) * 2 * 12 / 51
             return knob_potential
         return 0
+
+    def my_box(self) -> bool:
+        return self.round.box_owner is self
 
     def select_card_to_play(self):
         test_ps = self.round.ps.__copy__()
@@ -750,6 +757,7 @@ class PegRow:
         self.front_peg = self.back_peg = 0
         self.full_peg_row = ''
         self.game = None
+        self.player = None
         if __name__ == '__main__':
             screen_label.configure(font=('courier', 10))
         self.draw_for_new_game()
@@ -778,10 +786,14 @@ class PegRow:
         if __name__ == '__main__':
             self.screen_label.configure(text=self.full_peg_row)
 
+    def winning_score_reached(self):
+        return self.front_peg >= self.win_score
+
     def check_for_win(self):
         if self.game:
-            if not self.game.win_detected and self.front_peg >= self.win_score:
-                self.game.record_win(self)
+            if not self.game.win_detected and self.winning_score_reached():
+                self.game.win_detected = True
+                self.player.interface.display_win(self.player)
 
     def insert_peg_for_score(self, peg_value):
         peg_position = self.calc_peg_pos(peg_value)
