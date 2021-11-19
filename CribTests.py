@@ -8,8 +8,8 @@ Created on Tue Dec 17 08:57:50 2019
 import Crib
 import unittest
 import tkinter
-from Crib import Card as cc
 import re
+from Crib import Card as cc
 from CribResultsGenerator import CRG
 from random import shuffle
 
@@ -482,7 +482,7 @@ class CribTest(unittest.TestCase):
 
     def test_smart_computer_does_not_lead_with_a_five(self):
         re_five_lead = f'[{"|".join(Crib.SUITS)}]\nComputer : 5'
-        self.assertLessEqual(CRG().search_for_regex(re_five_lead), 20)
+        self.assertLessEqual(CRG().search_for_regex(re_five_lead), 30)
 
     def test_round_searcher(self):
         # print([CRG(version='2.1.2').search_for_regex(f'{v}!') for v in Crib.Round.dict_31.values()])
